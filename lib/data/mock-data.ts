@@ -34,11 +34,11 @@ export const weeklyContent: WeekContent[] = [
     subtitle: "SEMANA 1",
     items: [
       {
-        id: "material-1",
-        type: "material",
-        label: "Material • PDF",
-        title: "S01 - Material",
-        status: "completed",
+        id: "exam-1",
+        type: "exam",
+        label: "Examen • Evaluación",
+        title: "S01 - EXAMEN 01",
+        status: "pending",
       },
       {
         id: "forum-1",
@@ -95,4 +95,58 @@ export const userProfile: UserProfile = {
   documentoIdentidad: "61181383",
   fechaNacimiento: "18/11/2002",
   direccion: "MZ K2 LT 5 LOS JARDINES DE CHILLON, Puente Piedra, Lima, Lima, Perú",
+}
+
+export const exams: Record<string, any> = {
+  "exam-1": {
+    id: "exam-1",
+    title: "S01 - EXAMEN 01",
+    courseId: "1",
+    weekId: "week-1",
+    timeLimit: 60,
+    attempts: 0,
+    maxAttempts: 3,
+    questions: [
+      {
+        id: "q1",
+        type: "multiple-choice",
+        question: "¿Cuál es el objetivo principal de la auditoría de sistemas?",
+        options: [
+          "Desarrollar nuevos sistemas",
+          "Evaluar la seguridad y eficiencia de los sistemas de información",
+          "Programar aplicaciones",
+          "Diseñar bases de datos",
+        ],
+      },
+      {
+        id: "q2",
+        type: "checkbox",
+        question: "Selecciona los componentes de un sistema de información (puede haber múltiples respuestas):",
+        options: ["Hardware", "Software", "Datos", "Personas", "Procesos", "Redes"],
+      },
+      {
+        id: "q3",
+        type: "multiple-choice",
+        question: "¿Qué norma internacional se utiliza para la gestión de seguridad de la información?",
+        options: ["ISO 9001", "ISO 27001", "ISO 14001", "ISO 45001"],
+      },
+      {
+        id: "q4",
+        type: "text",
+        question: "Explica brevemente qué es un control interno en sistemas de información:",
+      },
+      {
+        id: "q5",
+        type: "checkbox",
+        question: "¿Cuáles de los siguientes son tipos de auditoría de sistemas?",
+        options: [
+          "Auditoría de seguridad",
+          "Auditoría de cumplimiento",
+          "Auditoría operativa",
+          "Auditoría financiera",
+          "Auditoría de desarrollo",
+        ],
+      },
+    ],
+  },
 }
