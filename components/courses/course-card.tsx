@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image" 
 import type { Course } from "@/lib/types"
 
 export default function CourseCard({ course }: { course: Course }) {
@@ -7,7 +8,15 @@ export default function CourseCard({ course }: { course: Course }) {
       href={`/dashboard/courses/${course.id}`}
       className="group overflow-hidden rounded-lg border bg-white shadow-sm transition-shadow hover:shadow-md"
     >
-      <div className="relative h-40 bg-gray-200">{/* Placeholder for course image */}</div>
+      {}
+      <div className="relative h-40 w-full">
+        <Image
+          src="/images/course.webp" 
+          alt={`Imagen del curso ${course.name}`}
+          fill 
+          className="object-cover" 
+        />
+      </div>
 
       <div className="p-4">
         <div className="mb-2 flex items-center justify-between">
