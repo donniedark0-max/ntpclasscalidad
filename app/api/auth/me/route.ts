@@ -37,31 +37,26 @@ export async function GET(request: Request) {
     }
 
     // Try to read user doc from Firestore. If admin credentials are missing, return fallback with a warning.
-    try {
-      const db = getFirestore()
-      const doc = await db.collection('users').doc(uid).get()
-      if (!doc.exists) return NextResponse.json({ ok: false, error: 'User not found' }, { status: 404 })
-
-      const data = doc.data() || {}
-      // Map stored fields to a safe response shape
-      const user = {
-        uid,
-        email: data.email || null,
-        name: data.name || null,
-        lastname: data.lastname || null,
-        number: data.number || null,
-        utpCode: data.email ? String(data.email).split('@')[0] : fallbackUser.utpCode,
-      }
-
-      return NextResponse.json({ ok: true, user })
-    } catch (err: any) {
-      // If credentials missing, return fallback info with a helpful warning instead of 500
-      const msg = String(err?.message || err)
-      if (msg.includes('Could not load the default credentials')) {
-        return NextResponse.json({ ok: true, user: fallbackUser, warning: 'Missing Firebase admin credentials. Set FIREBASE_SERVICE_ACCOUNT or GOOGLE_APPLICATION_CREDENTIALS to enable Firestore access.' })
-      }
-      throw err
+    const db = getFirestore()
+    if (!db) {
+      return NextResponse.json({ ok: true, user: fallbackUser, warning: 'Firebase admin not initialized. Server cannot read Firestore. Falling back to token data.' })
     }
+
+    const doc = await db.collection('users').doc(uid).get()
+    if (!doc.exists) return NextResponse.json({ ok: false, error: 'User not found' }, { status: 404 })
+
+    const data = doc.data() || {}
+    // Map stored fields to a safe response shape
+    const user = {
+      uid,
+      email: data.email || null,
+      name: data.name || null,
+      lastname: data.lastname || null,
+      number: data.number || null,
+      utpCode: data.email ? String(data.email).split('@')[0] : fallbackUser.utpCode,
+    }
+
+    return NextResponse.json({ ok: true, user })
   } catch (err: any) {
     console.error('/api/auth/me error', err)
     return NextResponse.json({ ok: false, error: 'Server error', message: err?.message }, { status: 500 })

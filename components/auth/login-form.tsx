@@ -15,10 +15,12 @@ export default function LoginForm() {
     username: "",
     password: "",
   })
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     try {
+      setLoading(true)
       const auth = getFirebaseAuth();
 
         // Build email from username if user entered a utpCode without @
@@ -36,17 +38,21 @@ export default function LoginForm() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ idToken }),
+          credentials: 'include',
         });
 
         const data = await res.json();
         if (res.ok && data.ok) {
-          router.push('/dashboard');
+          // Force a full navigation so the browser sends/reads cookies immediately
+          window.location.href = '/dashboard'
         } else {
           alert(data.error || 'Error al iniciar sesión');
         }
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'Error al iniciar sesión');
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -116,8 +122,18 @@ export default function LoginForm() {
           </a>
         </div>
 
-        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-          Iniciar sesión
+        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+          {loading ? (
+            <span className="inline-flex items-center gap-2">
+              <svg className="h-4 w-4 animate-spin text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+              Iniciando...
+            </span>
+          ) : (
+            'Iniciar sesión'
+          )}
         </Button>
       </form>
     </div>

@@ -1,12 +1,32 @@
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import CourseTabs from "@/components/courses/course-tabs"
 import WeekSection from "@/components/courses/week-section"
-import { courses, weeklyContent } from "@/lib/data/mock-data"
+import { courses, weeklyContent as mockWeeklyContent } from "@/lib/data/mock-data"
+import { getFirestore } from "@/lib/firebaseServer"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
-export default function CoursePage({ params }: { params: { courseId: string } }) {
-  const course = courses.find((c) => c.id === params.courseId)
+export default async function CoursePage({ params }: { params: { courseId: string } }) {
+  const p = await params
+  const course = courses.find((c) => c.id === p.courseId)
+
+  // Load weeks from Firestore server-side if available
+  let weeksToRender = mockWeeklyContent
+  try {
+    const db = getFirestore()
+    if (db) {
+      const snapshot = await db.collection('weeks').orderBy('week').get()
+      const arr: any[] = []
+      snapshot.forEach((doc: any) => {
+        const data = doc.data() || {}
+        // Each week doc contains: week (number), exam, createdAt
+        arr.push({ id: doc.id, title: `Semana ${data.week}`, subtitle: `SEMANA ${data.week}`, items: [ { id: data.exam?.id || `exam-${data.week}`, type: 'exam', label: 'Examen', title: data.exam?.title || `Examen Semana ${data.week}`, status: 'pending' } ] })
+      })
+      if (arr.length > 0) weeksToRender = arr
+    }
+  } catch (err) {
+    console.error('Failed to load weeks from Firestore', err)
+  }
 
   if (!course) return <div>Curso no encontrado</div>
 
@@ -39,7 +59,19 @@ export default function CoursePage({ params }: { params: { courseId: string } })
           Total de semanas <span className="text-gray-600">(18)</span>
         </h2>
 
-        {weeklyContent.map((week) => (
+        {/* Try load weeks from Firestore (weeks collection) on server; fallback to mock */}
+        {/**/}
+        {
+          // fetch weeks server-side
+        }
+        {
+          (() => {
+            // sync block: attempt to read Firestore
+            // We cannot run async code inside JSX directly; perform fetch above instead
+            return null
+          })()
+        }
+        {weeksToRender.map((week) => (
           <WeekSection key={week.id} week={week} />
         ))}
       </div>

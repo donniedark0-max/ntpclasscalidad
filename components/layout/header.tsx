@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import app from '@/lib/firebaseClient'
 import { Bell, Menu } from "lucide-react"
+import { ChevronDown } from 'lucide-react'
 
 type User = {
   uid?: string
@@ -11,16 +13,36 @@ type User = {
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null)
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let mounted = true
     fetch('/api/auth/me')
       .then(r => r.json())
-      .then((json) => {
+      .then(async (json) => {
         if (!mounted) return
-        if (json?.ok && json.user) setUser(json.user)
+        if (json?.ok && json.user) {
+          let u = json.user
+          // If server returned only fallback (no name/lastname) try client Firestore
+          if ((!u.name || !u.lastname) && u.uid) {
+            try {
+              const { getFirestore, doc, getDoc } = await import('firebase/firestore')
+              const db = getFirestore(app as any)
+              const userDoc = await getDoc(doc(db, 'users', u.uid))
+              if (userDoc.exists()) {
+                const data = userDoc.data()
+                u = { ...u, name: data.name || u.name, lastname: data.lastname || u.lastname }
+              }
+            } catch (e) {
+              // ignore client firestore errors
+            }
+          }
+          setUser(u)
+        }
       })
       .catch(() => {})
+      .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [])
 
@@ -34,7 +56,7 @@ export default function Header() {
 
       <div className="flex-1" />
 
-      <div className="flex items-center gap-4">
+  <div className="flex items-center gap-4">
         <button className="relative" aria-label="Notificaciones">
           <Bell className="h-6 w-6 text-gray-600" />
           <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-400 text-xs font-bold text-black">
@@ -42,12 +64,57 @@ export default function Header() {
           </span>
         </button>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-sm font-medium">Hola, {displayName}</p>
-            <p className="text-xs text-gray-500">Estudiante</p>
-          </div>
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500" role="img" aria-label="Avatar" />
+        <div className="relative">
+          <button
+            className="flex items-center gap-3"
+            aria-haspopup="menu"
+            onClick={() => { if (!loading) setOpen(v => !v) }}
+          >
+            <div className="text-right">
+              {loading ? (
+                <div className="space-y-1">
+                  <div className="h-4 w-40 animate-pulse rounded bg-gray-200" />
+                  <div className="h-3 w-24 animate-pulse rounded bg-gray-200 ml-13" />
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">Hola, {displayName}</p>
+                  <p className="text-xs text-gray-500">Estudiante</p>
+                </>
+              )}
+            </div>
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500" role="img" aria-label="Avatar" />
+            <ChevronDown className="h-4 w-4 text-gray-500" />
+          </button>
+
+          {open && (
+            <div role="menu" aria-label="Cuenta" className="absolute right-0 mt-2 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+              <div className="py-1">
+                <button
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  role="menuitem"
+                  onClick={async () => {
+                    try {
+                      await fetch('/api/auth/logout', { method: 'POST' })
+                      // Sign out client Firebase as well
+                          try {
+                              const { getAuth, signOut } = await import('firebase/auth')
+                              const auth = getAuth(app as any)
+                              await signOut(auth)
+                            } catch (e) {
+                              // ignore
+                            }
+                    } finally {
+                      // redirect to login page
+                      window.location.href = '/'
+                    }
+                  }}
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>
