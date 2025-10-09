@@ -11,7 +11,6 @@ const menuItems = [
   { icon: HelpCircle, label: "Ayuda", href: "/dashboard/ayuda" },
   { icon: FileText, label: "SAE", href: "/dashboard/sae" },
   { icon: Settings, label: "Configuración", href: "/dashboard/configuracion" },
-  { icon: Mail, label: "Correo UTP", href: "/dashboard/correo" },
   { icon: Library, label: "UTP+biblio", href: "/dashboard/biblioteca" },
 ]
 

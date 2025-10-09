@@ -1,10 +1,33 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { userProfile } from "@/lib/data/mock-data"
 
 export default function ProfileForm() {
   const [profile, setProfile] = useState(userProfile)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(json => {
+        if (!mounted) return
+        if (json?.ok && json.user) {
+          setProfile(prev => ({
+            ...prev,
+            nombres: json.user.name || prev.nombres,
+            apellidos: json.user.lastname || prev.apellidos,
+            correo: json.user.email || prev.correo,
+            celular: json.user.number || prev.celular,
+          }))
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [])
   const [editingField, setEditingField] = useState<string | null>(null)
 
   return (

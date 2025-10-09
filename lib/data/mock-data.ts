@@ -88,13 +88,13 @@ export const activities: Activity[] = [
 ]
 
 export const userProfile: UserProfile = {
-  celular: "904872163",
-  correo: "jjosesito185@gmail.com",
-  nombres: "Juan Jose",
-  apellidos: "Vilcahuaman Alvarado",
-  documentoIdentidad: "61181383",
-  fechaNacimiento: "18/11/2002",
-  direccion: "MZ K2 LT 5 LOS JARDINES DE CHILLON, Puente Piedra, Lima, Lima, Perú",
+  celular: "990123456",
+  correo: "usuario@ejemplo.com",
+  nombres: "Juan Carlos",
+  apellidos: "Pérez Gómez",
+  documentoIdentidad: "12345678",
+  fechaNacimiento: "01/01/1990",
+  direccion: "Av. Ficticia 123, Ciudad, País",
 }
 
 export const exams: Record<string, any> = {

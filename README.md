@@ -34,3 +34,23 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## API de autenticación (login/logout)
+
+Rutas añadidas:
+- `POST /api/auth/login` - body JSON { utpCode, password } → crea cookie HttpOnly con JWT si las credenciales son válidas.
+- `POST /api/auth/logout` - limpia la cookie de sesión.
+
+Variables de entorno útiles (ejemplo en `.env.local`):
+
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+FIREBASE_SERVICE_ACCOUNT="{...}"
+JWT_SECRET=tu-secreto
+SESSION_COOKIE_NAME=utp_session
+
+Notas:
+- Este ejemplo usa `firebase-admin` para leer la colección `users` en Firestore. Los usuarios deben existir en Firestore con campos `utpCode` y `password`.
+- En este prototipo la contraseña se compara en texto plano; en producción debes usar hashing (bcrypt) y HTTPS.
+

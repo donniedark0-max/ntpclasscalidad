@@ -1,12 +1,12 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useState, FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Eye, EyeOff, User } from "lucide-react"
+import { getFirebaseAuth } from '@/lib/firebaseClient'
+import { signInWithEmailAndPassword } from 'firebase/auth'
 
 export default function LoginForm() {
   const router = useRouter()
@@ -16,10 +16,38 @@ export default function LoginForm() {
     password: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Simulate login
-    router.push("/dashboard")
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    try {
+      const auth = getFirebaseAuth();
+
+        // Build email from username if user entered a utpCode without @
+        let email = formData.username;
+        if (!email.includes('@')) {
+          email = `${email}@utp.edu.pe`;
+        }
+
+        const cred = await signInWithEmailAndPassword(auth, email, formData.password);
+        const user = cred.user;
+
+        const idToken = await user.getIdToken();
+
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          router.push('/dashboard');
+        } else {
+          alert(data.error || 'Error al iniciar sesión');
+        }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error al iniciar sesión');
+    }
   }
 
   return (
