@@ -3,11 +3,8 @@ import ExamClient from "@/components/courses/exam-client"
 import { getFirestore } from "@/lib/firebaseServer"
 import { exams as mockExams } from "@/lib/data/mock-data"
 
-type Props = { params: { courseId: string; examId: string } }
-
-export default async function ExamPage({ params }: Props) {
-  const p = await params
-  const { courseId, examId } = p
+export default async function ExamPage({ params }: any) {
+  const { courseId, examId } = params
 
   let exam: any = null
   try {

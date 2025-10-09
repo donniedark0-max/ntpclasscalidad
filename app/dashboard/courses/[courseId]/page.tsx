@@ -6,9 +6,9 @@ import { getFirestore } from "@/lib/firebaseServer"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
-export default async function CoursePage({ params }: { params: { courseId: string } }) {
-  const p = await params
-  const course = courses.find((c) => c.id === p.courseId)
+export default async function CoursePage({ params }: any) {
+  const { courseId } = params
+  const course = courses.find((c) => c.id === courseId)
 
   // Load weeks from Firestore server-side if available
   let weeksToRender = mockWeeklyContent
