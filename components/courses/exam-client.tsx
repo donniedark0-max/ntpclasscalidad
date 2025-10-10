@@ -26,6 +26,8 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
   const [timeRemaining, setTimeRemaining] = useState<number>(exam?.timeLimit || 60)
   const [filesByQuestion, setFilesByQuestion] = useState<Record<string, File[]>>({})
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<string[] | null>(null)
 
   useEffect(() => {
     let t: any = null
@@ -166,6 +168,7 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
   const handleSubmit = async () => {
     try {
       setErrorMessage(null)
+      setValidationErrors(null)
       // fetch authenticated user (server session)
       const me = await fetch('/api/auth/me').then(r => r.json()).catch(() => null)
       const code = me?.user?.utpCode
@@ -190,6 +193,45 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
   const storage = getStorage(firebaseApp as any)
   const db = getFirestore(firebaseApp as any)
 
+      const errors: string[] = []
+      const questions = exam.questions || []
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i]
+        const qid = q.id
+        const val = answers[qid]
+
+        // Special rule for question 4 (index 3): allow either text or files
+        if (i === 3) {
+          const hasText = typeof val === 'string' && val.trim().length > 0
+          const hasFiles = (filesByQuestion[qid] && filesByQuestion[qid].length > 0)
+          if (!hasText && !hasFiles) {
+            errors.push(`Respuesta requerida para la pregunta ${i + 1} (texto o archivo)`)
+          }
+          continue
+        }
+
+        // For other questions, require a non-empty answer depending on type
+        if (q.type === 'text') {
+          if (!val || (typeof val === 'string' && val.trim().length === 0)) {
+            errors.push(`Respuesta de texto requerida para la pregunta ${i + 1}`)
+          }
+        } else if (q.type === 'multiple-choice') {
+          if (!val || (typeof val === 'string' && val.trim().length === 0)) {
+            errors.push(`Selecciona una opción para la pregunta ${i + 1}`)
+          }
+        } else if (q.type === 'checkbox') {
+          if (!val || !Array.isArray(val) || val.length === 0) {
+            errors.push(`Selecciona al menos una opción para la pregunta ${i + 1}`)
+          }
+        }
+      }
+
+      if (errors.length) {
+        setValidationErrors(errors)
+        return
+      }
+
+      setIsSubmitting(true)
       const uploadedAnswers: Record<string, any> = { ...answers }
 
       // upload files and merge with existing answers (don't overwrite text)
@@ -257,6 +299,7 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
     } catch (err) {
       console.error('submit exam error', err)
       setErrorMessage('Error al enviar el examen')
+      setIsSubmitting(false)
     }
   }
 
@@ -296,6 +339,7 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
       </Link>
 
       <div className="mb-6 rounded-lg bg-white p-6 shadow-sm">
+        {/* validation and error messages are shown below the action buttons */}
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold">{exam.title}</h1>
           <div className="flex items-center gap-2 text-orange-600">
@@ -388,7 +432,25 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
           <Link href={`/dashboard/courses/${courseId}`}>
             <Button variant="outline">Cancelar</Button>
           </Link>
-          <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700">Enviar examen</Button>
+          <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+            {isSubmitting ? 'Enviando...' : 'Enviar examen'}
+          </Button>
+        </div>
+        {/* Messages area below buttons */}
+        <div className="mt-4">
+          {validationErrors && validationErrors.length > 0 && (
+            <div className="mb-4 rounded border-l-4 border-red-500 bg-red-50 p-4 text-sm text-red-700">
+              <strong className="block font-semibold">Hay errores en el formulario:</strong>
+              <ul className="mt-2 list-disc pl-5">
+                {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+          {errorMessage && (
+            <div className="mb-4 rounded border-l-4 border-red-500 bg-red-50 p-4 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
         </div>
       </div>
     </div>
