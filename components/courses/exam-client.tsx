@@ -59,10 +59,13 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
         }
 
         try {
-          const firebaseApp = (await import('@/lib/firebaseClient')).default
-          const { getFirestore, doc, getDoc } = await import('firebase/firestore')
+          const fb = await import('@/lib/firebaseClient')
+          const getFirebaseApp = fb.getFirebaseApp || fb.default
+          const getFirebaseFirestore = fb.getFirebaseFirestore
+          const firebaseApp = await getFirebaseApp()
+          const firestoreMod = await getFirebaseFirestore()
+          const { getFirestore, doc, getDoc } = firestoreMod
           const db = getFirestore(firebaseApp as any)
-          const { collection } = await import('firebase/firestore')
           const colName = `answers_week-${weekNumber}`
           const dref = doc(db, colName, code)
           const snap = await getDoc(dref)
@@ -122,7 +125,7 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
   const handleFileChange = (questionId: string, files: FileList | null) => {
     setErrorMessage(null)
     if (!files) return
-    const arr = Array.from(files)
+  const arr = Array.from(files)
 
     // Validate types and size
     const allowed = ['image/jpeg', 'image/png', 'application/pdf']
@@ -147,9 +150,17 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
       setErrorMessage(errors.join('. '))
     }
 
-    // limit to 5 files
-    const final = valid.slice(0, 5)
-    setFilesByQuestion((prev) => ({ ...prev, [questionId]: final }))
+    // merge with existing files and limit to 5 total
+    setFilesByQuestion((prev) => {
+      const existing: File[] = prev[questionId] || []
+      const merged = [...existing, ...valid].slice(0, 5)
+      return { ...prev, [questionId]: merged }
+    })
+    // Clear input value to allow re-selecting the same file or additional selections
+    try {
+      const el = document.getElementById(`file-${questionId}`) as HTMLInputElement | null
+      if (el) el.value = ''
+    } catch (e) {}
   }
 
   const handleSubmit = async () => {
@@ -163,13 +174,21 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
         return
       }
 
-      // dynamic import firebase client for uploads and firestore writes
-      const firebaseApp = (await import('@/lib/firebaseClient')).default
-      const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage')
-      const { getFirestore, collection, doc, setDoc } = await import('firebase/firestore')
+  // dynamic import firebase client for uploads and firestore writes
+  const fb = await import('@/lib/firebaseClient')
+  const getFirebaseApp = fb.getFirebaseApp || fb.default
+  const getFirebaseStorage = fb.getFirebaseStorage
+  const getFirebaseFirestore = fb.getFirebaseFirestore
 
-      const storage = getStorage(firebaseApp as any)
-      const db = getFirestore(firebaseApp as any)
+  const firebaseApp = await getFirebaseApp()
+  const storageMod = await getFirebaseStorage()
+  const firestoreMod = await getFirebaseFirestore()
+
+  const { getStorage, ref, uploadBytes, getDownloadURL } = storageMod
+  const { getFirestore, collection, doc, setDoc } = firestoreMod
+
+  const storage = getStorage(firebaseApp as any)
+  const db = getFirestore(firebaseApp as any)
 
       const uploadedAnswers: Record<string, any> = { ...answers }
 
@@ -309,7 +328,7 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
                     <div key={optIndex} className="flex items-center space-x-2">
                       <Checkbox
                         id={`${question.id}-${optIndex}`}
-                        checked={answers[question.id]?.includes(option)}
+                        checked={!!(answers[question.id] && Array.isArray(answers[question.id]) && answers[question.id].includes(option))}
                         onChange={(e) => handleCheckbox(question.id, option, (e.target as HTMLInputElement).checked)}
                       />
                       <Label htmlFor={`${question.id}-${optIndex}`} className="cursor-pointer font-normal">{option}</Label>
