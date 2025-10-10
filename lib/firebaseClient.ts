@@ -1,5 +1,5 @@
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+// This module avoids importing firebase/* at top-level so it isn't bundled on the server.
+// Provide async getters which dynamically import firebase packages at runtime (client only).
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -10,24 +10,42 @@ const firebaseConfig = {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let appInstance!: FirebaseApp;
-if (!getApps().length) {
-    console.log('Firebase: initializing app with config', {
-        projectId: firebaseConfig.projectId,
-        authDomain: firebaseConfig.authDomain,
-    });
-    appInstance = initializeApp(firebaseConfig as any);
-    console.log('Firebase: app initialized successfully');
-} else {
-    appInstance = getApps()[0];
-    console.log('Firebase: app already initialized');
+let appInstance: any = null;
+
+export async function getFirebaseApp() {
+    // Only initialize on client
+    if (typeof window === 'undefined') return null;
+    if (appInstance) return appInstance;
+    const firebase = await import('firebase/app');
+    const { initializeApp, getApps } = firebase;
+    if (!getApps().length) {
+        // initialize with client config
+        appInstance = initializeApp(firebaseConfig as any);
+    } else {
+        appInstance = getApps()[0];
+    }
+    return appInstance;
 }
 
-export function getFirebaseAuth() {
-    console.log('Firebase: retrieving auth instance');
-    const auth = getAuth(appInstance as any);
-    console.log('Firebase: auth instance ready');
-    return auth;
+export async function getFirebaseAuth() {
+    const app = await getFirebaseApp();
+    if (!app) throw new Error('Firebase client not available');
+    const { getAuth } = await import('firebase/auth');
+    return getAuth(app as any);
 }
 
-export default appInstance;
+export async function getFirebaseStorage() {
+    const app = await getFirebaseApp();
+    if (!app) throw new Error('Firebase client not available');
+    const mod = await import('firebase/storage');
+    return mod; // caller can use mod.getStorage(app)
+}
+
+export async function getFirebaseFirestore() {
+    const app = await getFirebaseApp();
+    if (!app) throw new Error('Firebase client not available');
+    const mod = await import('firebase/firestore');
+    return mod;
+}
+
+export default getFirebaseApp;

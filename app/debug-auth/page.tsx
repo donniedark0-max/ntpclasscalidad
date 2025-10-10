@@ -12,8 +12,8 @@ export default function DebugAuthPage() {
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     try {
-      const auth = getFirebaseAuth();
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+  const auth = await getFirebaseAuth();
+  const cred = await signInWithEmailAndPassword(auth, email, password);
       console.log('signed in', cred.user);
       const idToken = await cred.user.getIdToken();
 
@@ -36,8 +36,8 @@ export default function DebugAuthPage() {
 
   const handleResendVerification = async () => {
     try {
-      const auth = getFirebaseAuth();
-      const user = auth.currentUser;
+    const auth = await getFirebaseAuth();
+    const user = auth.currentUser;
       if (!user) {
         setResult({ ok: false, message: 'No user currently signed in' });
         return;

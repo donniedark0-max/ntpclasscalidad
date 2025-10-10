@@ -21,7 +21,7 @@ export default function LoginForm() {
     e.preventDefault();
     try {
       setLoading(true)
-      const auth = getFirebaseAuth();
+  const auth = await getFirebaseAuth();
 
         // Build email from username if user entered a utpCode without @
         let email = formData.username;

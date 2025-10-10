@@ -6,11 +6,15 @@ import { getFirestore } from "@/lib/firebaseServer"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
-export default async function CoursePage({ params }: any) {
+export default async function CoursePage(props: any) {
+  const params = await props.params
   const { courseId } = params
   const course = courses.find((c) => c.id === courseId)
 
-  // Load weeks from Firestore server-side if available
+  
+
+  // Load weeks preferring server admin (getFirestore) like /api/auth/me. If admin not initialized,
+  // fall back to Firestore REST API using public API key and project id. If that fails, use mock.
   let weeksToRender = mockWeeklyContent
   try {
     const db = getFirestore()
@@ -19,13 +23,43 @@ export default async function CoursePage({ params }: any) {
       const arr: any[] = []
       snapshot.forEach((doc: any) => {
         const data = doc.data() || {}
-        // Each week doc contains: week (number), exam, createdAt
         arr.push({ id: doc.id, title: `Semana ${data.week}`, subtitle: `SEMANA ${data.week}`, items: [ { id: data.exam?.id || `exam-${data.week}`, type: 'exam', label: 'Examen', title: data.exam?.title || `Examen Semana ${data.week}`, status: 'pending' } ] })
       })
       if (arr.length > 0) weeksToRender = arr
+    } else {
+      // REST fallback
+      const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+      const FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+      if (FIREBASE_API_KEY && FIREBASE_PROJECT_ID) {
+        try {
+          const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery?key=${FIREBASE_API_KEY}`
+          const body = {
+            structuredQuery: {
+              from: [{ collectionId: 'weeks' }],
+              orderBy: [{ field: { fieldPath: 'week' }, direction: 'ASCENDING' }]
+            }
+          }
+          const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          if (r.ok) {
+            const arr = await r.json()
+            const mapped: any[] = []
+            for (const item of arr) {
+              if (!item.document) continue
+              const doc = item.document
+              const id = doc.name?.split('/').pop()
+              const weekNum = doc.fields?.week?.integerValue ? Number(doc.fields.week.integerValue) : null
+              const exam = doc.fields?.exam?.mapValue?.fields ? doc.fields.exam.mapValue.fields : null
+              mapped.push({ id, title: `Semana ${weekNum}`, subtitle: `SEMANA ${weekNum}`, items: [ { id: exam?.id?.stringValue || `exam-${weekNum}`, type: 'exam', label: 'Examen', title: exam?.title?.stringValue || `Examen Semana ${weekNum}`, status: 'pending' } ] })
+            }
+            if (mapped.length) weeksToRender = mapped
+          }
+        } catch (err) {
+          console.error('REST fetch for weeks failed', err)
+        }
+      }
     }
   } catch (err) {
-    console.error('Failed to load weeks from Firestore', err)
+    console.error('Failed to load weeks', err)
   }
 
   if (!course) return <div>Curso no encontrado</div>

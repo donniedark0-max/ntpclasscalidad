@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import app from '@/lib/firebaseClient'
+import getFirebaseApp, { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebaseClient'
 import { Bell, Menu } from "lucide-react"
 import { ChevronDown } from 'lucide-react'
 
@@ -27,12 +27,16 @@ export default function Header() {
           // If server returned only fallback (no name/lastname) try client Firestore
           if ((!u.name || !u.lastname) && u.uid) {
             try {
-              const { getFirestore, doc, getDoc } = await import('firebase/firestore')
-              const db = getFirestore(app as any)
-              const userDoc = await getDoc(doc(db, 'users', u.uid))
-              if (userDoc.exists()) {
-                const data = userDoc.data()
-                u = { ...u, name: data.name || u.name, lastname: data.lastname || u.lastname }
+              const firebase = await getFirebaseFirestore()
+              const appInstance = await getFirebaseApp()
+              if (firebase && appInstance) {
+                const { getFirestore, doc, getDoc } = firebase
+                const db = getFirestore(appInstance as any)
+                const userDoc = await getDoc(doc(db, 'users', u.uid))
+                if (userDoc.exists()) {
+                  const data = userDoc.data()
+                  u = { ...u, name: data.name || u.name, lastname: data.lastname || u.lastname }
+                }
               }
             } catch (e) {
               // ignore client firestore errors
@@ -98,9 +102,11 @@ export default function Header() {
                       await fetch('/api/auth/logout', { method: 'POST' })
                       // Sign out client Firebase as well
                           try {
-                              const { getAuth, signOut } = await import('firebase/auth')
-                              const auth = getAuth(app as any)
-                              await signOut(auth)
+                              const authMod = await getFirebaseAuth()
+                              if (authMod) {
+                                // getFirebaseAuth returns the auth instance
+                                await (authMod.signOut ? authMod.signOut() : Promise.resolve())
+                              }
                             } catch (e) {
                               // ignore
                             }

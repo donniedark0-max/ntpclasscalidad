@@ -12,9 +12,11 @@ import Link from "next/link"
 type Props = {
   exam: any
   courseId: string
+  initialSubmission?: any
+  initialSubmissionExists?: boolean
 }
 
-export default function ExamClient({ exam, courseId }: Props) {
+export default function ExamClient({ exam, courseId, initialSubmission, initialSubmissionExists }: Props) {
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [submitted, setSubmitted] = useState(false)
   const [submissionExists, setSubmissionExists] = useState(false)
@@ -81,7 +83,15 @@ export default function ExamClient({ exam, courseId }: Props) {
       }
     }
 
-    checkSubmission()
+    // If server passed initial submission, use it and skip client check
+    if (initialSubmissionExists) {
+      setSubmissionExists(true)
+      setSubmissionData(initialSubmission)
+      setSubmitted(true)
+      setCheckingSubmission(false)
+    } else {
+      checkSubmission()
+    }
     return () => { mounted = false }
   }, [exam])
 
@@ -163,7 +173,7 @@ export default function ExamClient({ exam, courseId }: Props) {
 
       const uploadedAnswers: Record<string, any> = { ...answers }
 
-      // upload files and replace with URLs
+      // upload files and merge with existing answers (don't overwrite text)
       for (const [qId, files] of Object.entries(filesByQuestion)) {
         if (!files || files.length === 0) continue
         const urls: string[] = []
@@ -182,7 +192,24 @@ export default function ExamClient({ exam, courseId }: Props) {
           const url = await getDownloadURL(r)
           urls.push(url)
         }
-        uploadedAnswers[qId] = urls
+
+        const existing = uploadedAnswers[qId]
+        // If there is no existing answer, store URLs array
+        if (existing === undefined || existing === null) {
+          uploadedAnswers[qId] = { files: urls }
+        } else if (typeof existing === 'string') {
+          // text answer -> preserve text and attach files
+          uploadedAnswers[qId] = { text: existing, files: urls }
+        } else if (Array.isArray(existing)) {
+          // choices array (checkboxes) -> preserve choices and attach files
+          uploadedAnswers[qId] = { choices: existing, files: urls }
+        } else if (typeof existing === 'object') {
+          // merge into existing object, avoid overwriting existing files
+          uploadedAnswers[qId] = { ...existing, files: urls }
+        } else {
+          // fallback
+          uploadedAnswers[qId] = { value: existing, files: urls }
+        }
       }
 
       // determine week number for collection name
