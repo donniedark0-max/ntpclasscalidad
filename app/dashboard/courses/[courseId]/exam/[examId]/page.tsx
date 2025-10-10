@@ -38,8 +38,9 @@ export default async function ExamPage(props: {
   let initialSubmission: any = null
   let initialSubmissionExists = false
   try {
-    const cookieStore: any = cookies()
-    const token = cookieStore.get(process.env.SESSION_COOKIE_NAME || 'utp_session')?.value
+    const cookieStore = await cookies()
+const token = cookieStore.get(process.env.SESSION_COOKIE_NAME || 'utp_session')?.value
+
     let utpCode: string | null = null
     if (token) {
       try {
