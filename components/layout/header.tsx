@@ -54,19 +54,27 @@ export default function Header() {
 
   return (
     <header className="flex items-center justify-between border-b bg-white px-6 py-4">
+      {/* logo at the far left */}
+      <div className="flex items-center">
+        <img src="/images/login/logo-pao-class.png" alt="UTP+class" className="h-6 w-auto mr-4" />
+      </div>
+
       <button className="lg:hidden" aria-label="Abrir menú">
         <Menu className="h-6 w-6" />
       </button>
 
       <div className="flex-1" />
 
-  <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4">
         <button className="relative" aria-label="Notificaciones">
           <Bell className="h-6 w-6 text-gray-600" />
           <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-400 text-xs font-bold text-black">
             2
           </span>
         </button>
+
+        {/* vertical separator */}
+        <div className="h-6 w-px bg-gray-900" aria-hidden="true" />
 
         <div className="relative">
           <button
@@ -82,7 +90,10 @@ export default function Header() {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm font-medium">Hola, {displayName}</p>
+                  <p className="text-sm">
+                    <span className="font-medium">Hola, </span>
+                    <span className="font-bold">{displayName}</span>
+                  </p>
                   <p className="text-xs text-gray-500">Estudiante</p>
                 </>
               )}

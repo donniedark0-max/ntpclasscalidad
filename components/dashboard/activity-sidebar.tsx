@@ -13,7 +13,7 @@ export default function ActivitySidebar({ activities }: { activities: Activity[]
 
       <div className="space-y-4">
         {activities.map((activity) => (
-          <div key={activity.id} className="rounded-lg border p-3">
+          <div key={activity.id} className="rounded-lg p-3 bg-[#EFF6FE]">
             <div className="mb-2 flex items-start gap-2">
               <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400" />
               <div className="flex-1">

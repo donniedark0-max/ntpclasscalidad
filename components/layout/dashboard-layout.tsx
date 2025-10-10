@@ -6,7 +6,7 @@ import Header from "./header"
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-[#EFF6FE]">
       <Sidebar />
       <div className="flex flex-1 flex-col">
         <Header />

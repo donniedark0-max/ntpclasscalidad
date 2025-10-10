@@ -7,7 +7,14 @@ export default function CourseCard({ course }: { course: Course }) {
       href={`/dashboard/courses/${course.id}`}
       className="group overflow-hidden rounded-lg border bg-white shadow-sm transition-shadow hover:shadow-md"
     >
-      <div className="relative h-40 bg-gray-200">{/* Placeholder for course image */}</div>
+      <div className="relative h-40 bg-gray-200">
+        {/* course images stored in public/images/courses/course-1.png..course-3.png */}
+        <img
+          src={`/images/courses/course-${Number(course.id) || 1}.png`}
+          alt={`${course.name} image`}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      </div>
 
       <div className="p-4">
         <div className="mb-2 flex items-center justify-between">
