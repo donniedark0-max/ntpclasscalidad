@@ -302,7 +302,7 @@ export default function ProfileForm() {
             <div>
               <p className="font-semibold">Dirección de domicilio</p>
               {!editing.other ? (
-                loading ? <FieldSkeleton width="w-72" /> : <p className="text-gray-700">{display(profile.direccion)}</p>
+                loading ? <FieldSkeleton width="h-4.5 w-72" /> : <p className="text-gray-700">{display(profile.direccion)}</p>
               ) : (
                 <input aria-label="Dirección" placeholder="Dirección" title="Dirección" className="mt-1 w-full rounded border px-3 py-2" value={profile.direccion || ''} onChange={(e) => setProfile(prev => ({ ...prev, direccion: e.target.value }))} />
               )}
@@ -316,7 +316,7 @@ export default function ProfileForm() {
             <div>
               <p className="font-semibold">Movilidad</p>
               {!editing.other ? (
-                loading ? <FieldSkeleton width="w-40" /> : <p className="text-gray-700">{display(profile.movilidad)}</p>
+                loading ? <FieldSkeleton width="h-4.5 h-4.5w-40" /> : <p className="text-gray-700">{display(profile.movilidad)}</p>
               ) : (
                 <input aria-label="Movilidad" placeholder="Movilidad" title="Movilidad" className="mt-1 w-full rounded border px-3 py-2" value={profile.movilidad || ''} onChange={(e) => setProfile(prev => ({ ...prev, movilidad: e.target.value }))} />
               )}
@@ -330,7 +330,7 @@ export default function ProfileForm() {
             <div>
               <p className="font-semibold">Contacto de emergencia</p>
               {!editing.other ? (
-                loading ? <FieldSkeleton width="w-40" /> : <p className="text-gray-700">{display(profile.contactoEmergencia)}</p>
+                loading ? <FieldSkeleton width="h-4.5 h-4.5w-40" /> : <p className="text-gray-700">{display(profile.contactoEmergencia)}</p>
               ) : (
                 <input aria-label="Contacto de emergencia" placeholder="Contacto de emergencia" title="Contacto de emergencia" className="mt-1 w-full rounded border px-3 py-2" value={profile.contactoEmergencia || ''} onChange={(e) => setProfile(prev => ({ ...prev, contactoEmergencia: e.target.value }))} />
               )}

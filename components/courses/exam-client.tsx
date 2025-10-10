@@ -73,9 +73,25 @@ export default function ExamClient({ exam, courseId, initialSubmission, initialS
           const snap = await getDoc(dref)
           if (snap.exists()) {
             const data = snap.data()
-            setSubmissionExists(true)
-            setSubmissionData(data)
-            setSubmitted(true)
+            const foundExamId = data?.examId
+            const expectedIds: string[] = []
+            if (exam && exam.id) expectedIds.push(String(exam.id))
+            if (exam && (exam.weekId || exam.week)) {
+              const m = String(exam.weekId || exam.week).match(/(\d+)/)
+              const weekNum = m ? m[1] : null
+              if (weekNum) {
+                expectedIds.push(`exam-week-${weekNum}`)
+                expectedIds.push(`exam-${weekNum}`)
+              }
+              if (exam.weekId) expectedIds.push(String(exam.weekId))
+            }
+            if (foundExamId && expectedIds.includes(String(foundExamId))) {
+              setSubmissionExists(true)
+              setSubmissionData(data)
+              setSubmitted(true)
+            } else {
+              console.debug('Client: Found submission doc but examId does not match', { foundExamId, expectedIds, currentExamId: exam?.id })
+            }
           }
         } catch (e) {
           // If client cannot read Firestore due to rules, ignore — server will still allow submit

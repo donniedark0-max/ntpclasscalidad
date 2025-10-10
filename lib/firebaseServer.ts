@@ -1,12 +1,19 @@
-import admin from 'firebase-admin';
-
-let app: admin.app.App;
+// Load firebase-admin lazily so Next.js doesn't try to bundle optional vendor chunks
+let admin: any = null
+let app: any = null
 
 function initFirebaseAdmin() {
-  if (admin.apps && admin.apps.length) {
-    app = admin.apps[0]!;
-    return app;
+  if (app) return app
+
+  try {
+    // Require dynamically to avoid static analysis bundling in Next server runtime
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    admin = require('firebase-admin')
+  } catch (e: any) {
+    console.warn('firebase-admin not available:', e?.message || e)
+    return undefined as any
   }
+
   const fs = require('fs')
   const path = require('path')
 
@@ -15,7 +22,7 @@ function initFirebaseAdmin() {
     const rootSa = path.resolve(process.cwd(), 'utp-class-fsc.json')
     if (fs.existsSync(rootSa)) {
       const obj = JSON.parse(fs.readFileSync(rootSa, 'utf8'))
-      app = admin.initializeApp({ credential: admin.credential.cert(obj as admin.ServiceAccount), projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID })
+      app = admin.initializeApp({ credential: admin.credential.cert(obj), projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID })
       return app
     }
   } catch (e: any) {
@@ -33,7 +40,7 @@ function initFirebaseAdmin() {
       } else {
         obj = JSON.parse(serviceAccountJson)
       }
-      app = admin.initializeApp({ credential: admin.credential.cert(obj as admin.ServiceAccount), projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID })
+      app = admin.initializeApp({ credential: admin.credential.cert(obj), projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID })
       return app
     } catch (err: any) {
       console.log('FIREBASE_SERVICE_ACCOUNT provided but invalid JSON; firebase-admin not initialized')
@@ -56,7 +63,7 @@ function initFirebaseAdmin() {
 export function getFirestore() {
   if (!app) {
     initFirebaseAdmin();
-    if (!app) return undefined as any
+    if (!app || !admin) return undefined as any
   }
   return admin.firestore();
 }
