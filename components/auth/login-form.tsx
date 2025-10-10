@@ -61,22 +61,21 @@ export default function LoginForm() {
       <div className="mb-8">
         <div className="mb-6 flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <span className="bg-black px-2 py-1 text-xl font-bold text-white">UTP</span>
-            <span className="text-xl font-bold text-red-600">+class</span>
+            <img src="/images/login/logo-pao-class.png" alt="UTP+class" className="h-10 w-auto" />
           </div>
         </div>
 
-        <h1 className="mb-2 text-3xl font-bold">La nueva experiencia digital de aprendizaje</h1>
-        <p className="text-lg text-gray-600">Cercana, dinámica y flexible</p>
+        <h1 className="mb-2 text-2xl font-bold">La nueva experiencia digital de aprendizaje</h1>
+        <p className="text-2xl text-[#3e4558] font-light">Cercana, dinámica y flexible</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <p className="text-sm">
-          Ingresa tus datos para <strong>iniciar sesión.</strong>
-        </p>
+        <p className="text-[16px] text-[#72767b]">
+          Ingresa tus datos para <strong className="font-bold text-[#161D1F]">iniciar sesión.</strong>
+        </p>  
 
         <div>
-          <label htmlFor="username" className="mb-2 block text-sm font-medium">
+          <label htmlFor="username" className="mb-2 block text-sm font-bold text-[#161D1F]">
             Código UTP
           </label>
           <div className="relative">
@@ -90,11 +89,21 @@ export default function LoginForm() {
             />
             <User className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
           </div>
-          <p className="mt-1 text-xs text-gray-500">Ejemplo de usuario: U1533148 (no digitar el @utp.edu.pe)</p>
+          <p className="mt-1 text-xs text-[#000f37] flex items-center">
+            <svg
+              data-testid="icon"
+              viewBox="0 0 1024 1024"
+              name="Mail"
+              className="text-info-icon mr-2 h-4 w-4"
+            >
+              <path d="M512 981.333c-260.267 0-469.333-209.067-469.333-469.333s209.067-469.333 469.333-469.333 469.333 209.067 469.333 469.333-209.067 469.333-469.333 469.333zM512 128c-213.333 0-384 170.667-384 384s170.667 384 384 384c213.333 0 384-170.667 384-384s-170.667-384-384-384z M512 725.333c-25.6 0-42.667-17.067-42.667-42.667v-170.667c0-25.6 17.067-42.667 42.667-42.667s42.667 17.067 42.667 42.667v170.667c0 25.6-17.067 42.667-42.667 42.667z M512 384c-4.267 0-12.8 0-17.067-4.267s-8.533-4.267-12.8-8.533c-8.533-8.533-12.8-17.067-12.8-29.867 0-4.267 0-4.267 0-8.533s0-4.267 4.267-8.533c0-4.267 4.267-4.267 4.267-8.533s4.267-4.267 4.267-4.267c4.267-4.267 8.533-8.533 12.8-8.533 17.067-8.533 34.133-4.267 46.933 8.533 0 0 4.267 4.267 4.267 4.267 0 4.267 4.267 4.267 4.267 8.533s0 4.267 4.267 8.533c0 4.267 0 4.267 0 8.533 0 12.8-4.267 21.333-12.8 29.867-4.267 0-4.267 4.267-4.267 4.267-4.267 0-4.267 4.267-8.533 4.267s-4.267 0-8.533 4.267c-4.267 0-4.267 0-8.533 0z"></path>
+            </svg>
+            Ejemplo de usuario: U1533148 (no digitar el @utp.edu.pe)
+          </p>
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-2 block text-sm font-medium">
+          <label htmlFor="password" className="mb-2 block text-sm font-bold text-[#161D1F]">
             Contraseña
           </label>
           <div className="relative">
@@ -117,7 +126,7 @@ export default function LoginForm() {
         </div>
 
         <div className="text-right">
-          <a href="#" className="text-sm text-blue-600 hover:underline">
+          <a href="#" className="text-sm font-semibold text-[#0661FC] hover:text-[#0099d3]">
             Restablecer contraseña
           </a>
         </div>

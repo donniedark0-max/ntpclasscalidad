@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/', '/api/auth/login', '/api/auth/logout', '/api/auth/me', '/favicon.ico']
+const PUBLIC_PATHS = ['/', '/api/auth/login', '/api/auth/logout', '/api/auth/me', '/favicon.ico', '/images', '/images/']
 const COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'utp_session'
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me'
 
@@ -9,7 +9,7 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Allow next internals and public assets
-  if (pathname.startsWith('/_next') || pathname.startsWith('/static') || pathname.startsWith('/public')) {
+  if (pathname.startsWith('/_next') || pathname.startsWith('/static') || pathname.startsWith('/public') || pathname.startsWith('/images') || pathname.startsWith('/favicon.ico')) {
     return NextResponse.next()
   }
 
@@ -50,5 +50,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: '/((?!_next/static|_next/image|favicon.ico).*)',
+  // don't match static assets under /_next, /static, /images, or favicon
+  matcher: '/((?!_next/static|_next/image|favicon.ico|images|static).*)',
 }
