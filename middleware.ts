@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/', '/api/auth/login', '/api/auth/logout', '/api/auth/me', '/favicon.ico', '/images', '/images/']
+const PUBLIC_PATHS = ['/', '/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/tests', '/favicon.ico', '/images', '/images/']
 const COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'utp_session'
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me'
 
