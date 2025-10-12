@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getBrowser } from '../../../../lib/puppeteer-browser';
-import { Browser } from 'puppeteer';
+import { Browser, Page } from 'puppeteer';
 import path from 'path';
 
 // --- Constantes de URLs para la prueba ---
@@ -51,7 +51,7 @@ function generateRelevantDetail(tramiteType: string): string {
 export async function GET() {
   console.log('🚀 Iniciando prueba de Solicitudes SAE...');
   let browser: Browser | null = null;
-  let page: any = null;
+  let page: Page | null = null;
 
   try {
     browser = await getBrowser();
@@ -97,14 +97,24 @@ export async function GET() {
     const filePath = path.resolve(process.cwd(), 'public/images/courses/course-3.png');
     await fileInput.uploadFile(filePath);
     console.log('✅ Formulario completado y archivo adjuntado.');
-
+    
     // --- 3. ENVIAR FORMULARIO Y VERIFICAR ÉXITO ---
     await page.click("button[type='submit']");
     await page.waitForSelector("div[class*='text-green-700']", { timeout: 15000 });
     console.log('✅ ¡Solicitud enviada con éxito!');
     
-    // --- 4. TOMAR CAPTURA DE PANTALLA (CON EL TICKET VISIBLE) ---
-    console.log('📸 Tomando captura de pantalla con el ticket de confirmación...');
+    // --- 4. TOMAR CAPTURA DE PANTALLA (Punto Clave Modificado) ---
+    console.log('📸 Tomando captura de pantalla del ticket y formulario...');
+
+    // Desplazamos la vista hacia abajo para asegurar que el formulario sea visible junto al ticket.
+    // Puedes ajustar el valor de '300' si necesitas que baje más o menos.
+    await page.evaluate(() => {
+        window.scrollBy(0, 300); 
+    });
+    
+    // Damos una pequeña pausa para asegurar que el scroll se complete.
+    await new Promise(r => setTimeout(r, 500));
+
     const screenshotBuffer = await page.screenshot({ type: 'png' });
 
     // --- 5. CERRAR SESIÓN ---
