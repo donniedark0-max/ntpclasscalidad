@@ -53,16 +53,13 @@ export async function login(page: Page) {
 export async function logout(page: Page) {
   console.log('Cerrando sesión...');
   const menuTriggerSelector = 'button[aria-haspopup="menu"]';
-  await page.waitForSelector(menuTriggerSelector, { visible: true });
+  await page.waitForSelector(menuTriggerSelector);
   await page.click(menuTriggerSelector);
 
-  // Selector robusto para el botón de logout: busca cualquier elemento botón dentro del menú
-  // cuyo texto normalizado contenga 'cerrar' y 'sesion' (sin depender de tildes exactas o mayúsculas).
-  const logoutXPathSelector = `//div[@role='menu']//button[contains(translate(normalize-space(.), 'ÁÉÍÓÚÀÈÌÒÙÃÕ', 'aeiouaeiouao'), 'cerrar') and contains(translate(normalize-space(.), 'ÁÉÍÓÚÀÈÌÒÙÃÕ', 'aeiouaeiouao'), 'sesion')]`;
-
-  const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { timeout: 10000 });
+  const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
+  const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`);
   if (!logoutButton) {
-    throw new Error('No se pudo encontrar el botón de "Cerrar sesión" en el menú.');
+    throw new Error('No se pudo encontrar el botón de "Cerrar sesión".');
   }
   await logoutButton.click();
   await page.waitForNavigation({ waitUntil: 'networkidle2' });

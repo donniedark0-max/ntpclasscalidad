@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getBrowser } from '../../../../lib/puppeteer-browser'; 
+import { getBrowser } from '../../../../lib/puppeteer-browser';
 import { Browser } from 'puppeteer';
-import { logout } from '@/lib/puppeteer-helpers';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const LOGIN_URL = `${APP_URL}/`;
@@ -12,11 +11,9 @@ export async function GET() {
 
   try {
     browser = await getBrowser();
-
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
 
-    // Leer y parsear el JSON de usuarios del .env
     const usersJson = process.env.TEST_USERS_JSON;
     if (!usersJson) {
       throw new Error('La variable de entorno TEST_USERS_JSON no está definida.');
@@ -35,14 +32,48 @@ export async function GET() {
     await page.click('button[type="submit"]');
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
-    // Verificación de inicio de sesión
     if (!page.url().startsWith(DASHBOARD_URL)) {
-      throw new Error(`Inicio de sesión fallido. URL actual: ${page.url()}`);
+      await page.screenshot({ path: '/tmp/login_failed.png' });
+      throw new Error(`Inicio de sesión fallido. Se tomó captura en /tmp/login_failed.png. URL actual: ${page.url()}`);
     }
     console.log('✅ Inicio de sesión exitoso.');
 
-  // Use shared logout helper (selector robusto y espera)
-  await logout(page);
+    // --- LOGOUT A PRUEBA DE FALLOS ---
+
+    // 1. Esperar a que el botón del menú esté visible y listo para el clic.
+    const menuTriggerSelector = 'button[aria-haspopup="menu"]';
+    console.log('🔍 Esperando el botón del menú de usuario...');
+    await page.waitForSelector(menuTriggerSelector, { visible: true, timeout: 15000 });
+    
+    console.log('🖱️ Haciendo clic en el botón del menú...');
+    await page.click(menuTriggerSelector);
+    
+    // 2. Esperar un momento a que la animación del menú termine.
+    // Aumentamos el tiempo a 1 segundo por si Vercel es lento.
+    await page.waitForTimeout(1000);
+
+    // 3. (PARA DEPURAR) Tomar una captura para ver si el menú se abrió.
+    console.log('📸 Tomando captura para verificar que el menú se abrió...');
+    await page.screenshot({ path: '/tmp/menu_opened.png' });
+
+    // 4. Buscar el botón de logout.
+    const logoutXPathSelector = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZÓ', 'abcdefghijklmnopqrstuvwxyzó'), 'cerrar sesión')]";
+    console.log('🔍 Buscando el botón de "Cerrar sesión"...');
+    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
+
+    if (logoutButton) {
+      console.log('🖱️ Haciendo clic en "Cerrar sesión"...');
+      await logoutButton.click();
+    } else {
+      throw new Error('El botón de "Cerrar sesión" nunca se hizo visible.');
+    }
+    
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+
+    if (!page.url().startsWith(LOGIN_URL)) {
+      throw new Error(`Cierre de sesión fallido. URL actual: ${page.url()}`);
+    }
+    console.log('✅ Cierre de sesión exitoso.');
     console.log('✅ Test completado. Tomando captura de pantalla final...');
     
     const screenshotBuffer = await page.screenshot({ type: 'png' });
@@ -58,13 +89,13 @@ export async function GET() {
 
   } catch (error) {
     console.error('❌ Error en la prueba de autenticación:', error);
-    // Para depurar mejor, toma una captura de pantalla si hay un error
     if (browser) {
-        const page = (await browser.pages())[0];
-        if (page) {
-            await page.screenshot({ path: '/tmp/error_screenshot.png' });
-            console.log('📸 Captura de pantalla del error guardada en /tmp/error_screenshot.png');
-        }
+      const page = (await browser.pages())[0];
+      if (page) {
+        // (CRUCIAL) Tomar una captura en el momento exacto del error.
+        await page.screenshot({ path: '/tmp/error_screenshot.png' });
+        console.log('📸 Captura de pantalla del error guardada. Revisa los logs.');
+      }
     }
     const errorMessage = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
