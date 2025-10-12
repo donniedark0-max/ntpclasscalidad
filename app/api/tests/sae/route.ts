@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
+import { getBrowser } from '../../../../lib/puppeteer-browser';
+import { Browser } from 'puppeteer';
 import path from 'path';
-import { login, logout } from '@/lib/puppeteer-helpers';
+
+// --- Constantes de URLs para la prueba ---
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const LOGIN_URL = `${APP_URL}/`;
+const DASHBOARD_URL = `${APP_URL}/dashboard`;
+const SAE_URL = `${APP_URL}/dashboard/sae/solicitudes`;
 
 // --- Datos y Funciones para la Prueba ---
-
 const tramiteTypes = [
     "Ampliación de vigencia/Cambio de título (Tesis o Trabajo de Suficiencia Profesional)",
     "Aprobación Plan Tesis o Trabajo Suficiencia Profesional",
@@ -26,14 +31,8 @@ function generateRandomPhoneNumber(): string {
   return `9${Math.floor(10000000 + Math.random() * 90000000)}`;
 }
 
-/**
- * Genera un detalle corto y relevante basado en el tipo de trámite seleccionado.
- * @param tramiteType - El tipo de trámite elegido.
- * @returns Una cadena con el detalle de la solicitud.
- */
 function generateRelevantDetail(tramiteType: string): string {
     const lowerCaseType = tramiteType.toLowerCase();
-
     if (lowerCaseType.includes('tesis')) {
         return "Solicito la revisión y aprobación de mi plan de tesis para poder continuar con el desarrollo.";
     }
@@ -46,43 +45,51 @@ function generateRelevantDetail(tramiteType: string): string {
     if (lowerCaseType.includes('ampliación')) {
         return "Solicito una ampliación de vigencia para culminar mi trabajo de suficiencia profesional.";
     }
-    // Respuesta por defecto si no coincide ninguna palabra clave
     return "Solicito información y gestión sobre el trámite seleccionado. Quedo a la espera de su respuesta.";
 }
 
-
 export async function GET() {
   console.log('🚀 Iniciando prueba de Solicitudes SAE...');
-  let browser = null;
+  let browser: Browser | null = null;
+  let page: any = null;
 
   try {
-    browser = await puppeteer.launch({
-      headless: false,
-      slowMo: 120,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
+    browser = await getBrowser();
+    page = await browser.newPage();
     await page.setViewport({ width: 1366, height: 768 });
 
-    await login(page);
+    // --- 1. INICIO DE SESIÓN ---
+    const usersJson = process.env.TEST_USERS_JSON;
+    if (!usersJson) throw new Error('La variable de entorno TEST_USERS_JSON no está definida.');
+    const users = JSON.parse(usersJson);
+    if (users.length === 0) throw new Error('No se encontraron usuarios de prueba.');
+    const testUser = users[Math.floor(Math.random() * users.length)];
 
-    await page.goto(`${process.env.NEXT_PUBLIC_APP_URL}/dashboard/sae/solicitudes`, { waitUntil: 'networkidle2' });
+    await page.goto(LOGIN_URL, { waitUntil: 'networkidle2' });
+    await page.type('#username', testUser.code);
+    await page.type('#password', testUser.password);
+    await page.click('button[type="submit"]');
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+
+    if (!page.url().startsWith(DASHBOARD_URL)) {
+      throw new Error(`El inicio de sesión falló. URL actual: ${page.url()}`);
+    }
+    console.log('✅ Inicio de sesión exitoso.');
+
+    // --- 2. NAVEGAR Y LLENAR FORMULARIO SAE ---
+    await page.goto(SAE_URL, { waitUntil: 'networkidle2' });
     console.log('✅ Formulario de Solicitudes SAE cargado.');
 
     console.log('📝 Llenando el formulario con datos coherentes...');
-
-    // 1. Seleccionar un trámite aleatorio
     const randomTramite = getRandomItem(tramiteTypes);
     await page.select('#tipo', randomTramite);
-    console.log(`-> Tipo de trámite: ${randomTramite}`);
+    console.log(`-> Tipo de trámite seleccionado: ${randomTramite}`);
 
-    // 2. Generar un detalle relevante para ese trámite
     const relevantDetail = generateRelevantDetail(randomTramite);
+    await page.type("#detalle", relevantDetail);
     console.log(`-> Detalle generado: "${relevantDetail}"`);
     
-    // 3. Llenar el formulario
     await page.type("#telefono", generateRandomPhoneNumber());
-    await page.type("#detalle", relevantDetail); 
     await page.click("input[type='checkbox']");
 
     const fileInput = await page.$('input[type="file"]#sae-file-input');
@@ -91,27 +98,55 @@ export async function GET() {
     await fileInput.uploadFile(filePath);
     console.log('✅ Formulario completado y archivo adjuntado.');
 
+    // --- 3. TOMAR CAPTURA DE PANTALLA (Punto Clave) ---
+    console.log('📸 Tomando captura de pantalla del formulario lleno ANTES de enviarlo...');
+    const screenshotBuffer = await page.screenshot({ type: 'png' });
+
+    // --- 4. ENVIAR FORMULARIO Y VERIFICAR ÉXITO ---
     await page.click("button[type='submit']");
-    
     await page.waitForSelector("div[class*='text-green-700']", { timeout: 15000 });
     console.log('✅ ¡Solicitud enviada con éxito!');
     
-    await logout(page);
+    // --- 5. CERRAR SESIÓN ---
+    const menuTriggerSelector = 'button[aria-haspopup="menu"]';
+    console.log('🔍 Buscando el menú de usuario para cerrar sesión...');
+    await page.click(menuTriggerSelector);
+    
+    const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
+    console.log('⏳ Esperando que aparezca el botón "Cerrar sesión"...');
+    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
+    
+    if (!logoutButton) throw new Error('El botón de logout nunca apareció en el menú.');
 
-    console.log('🎉 ¡Prueba de Solicitudes SAE completada con éxito!');
-    return NextResponse.json({ success: true, message: 'Prueba de solicitud SAE completada correctamente.' });
+    await logoutButton.click();
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+
+    if (!page.url().startsWith(LOGIN_URL)) {
+      throw new Error(`El cierre de sesión falló. La URL final es: ${page.url()}`);
+    }
+    console.log('✅ Cierre de sesión exitoso.');
+    console.log('🎉 ¡Prueba de ciclo completo de SAE finalizada!');
+
+    // --- 6. DEVOLVER LA CAPTURA DE PANTALLA ---
+    const imageBlob = new Blob([new Uint8Array(screenshotBuffer)], { type: 'image/png' });
+
+    return new NextResponse(imageBlob, {
+        status: 200,
+        headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
+    });
 
   } catch (error) {
     console.error('❌ Error en la prueba de Solicitudes SAE:', error);
-    if (browser) {
-      const page = (await browser.pages())[0];
-      if (page) {
-        await page.screenshot({ path: 'public/error-sae-test.png' });
-        console.log('📸 Se ha guardado una captura de pantalla del error.');
-      }
+    if (page) {
+      // Guardar en /tmp para compatibilidad con Vercel
+      await page.screenshot({ path: '/tmp/error_sae_screenshot.png' });
+      console.log('📸 Captura de pantalla del error guardada en /tmp.');
     }
-    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   } finally {
-    if (browser) await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 }
