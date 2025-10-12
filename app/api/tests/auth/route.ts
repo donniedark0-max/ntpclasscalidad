@@ -1,54 +1,86 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
-import { login, logout } from '@/lib/puppeteer-helpers'; 
+import { getBrowser } from '../../../../lib/puppeteer-browser'; // CAMBIO 1: Importar tu helper
+import { Browser } from 'puppeteer';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const LOGIN_URL = `${APP_URL}/`;
+const DASHBOARD_URL = `${APP_URL}/dashboard`;
 
 export async function GET() {
-  let browser = null;
+  let browser: Browser | null = null;
 
   try {
-    browser = await puppeteer.launch({
-      headless: false,
-      slowMo: 100,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    // CAMBIO 2: Usar el helper para obtener la instancia del navegador
+    // Esto funciona automáticamente en local y en Vercel
+    browser = await getBrowser();
 
     const page = await browser.newPage();
-    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setViewport({ width: 1280, height: 800 });
 
-    // 1. Iniciar sesión con un usuario aleatorio
-    await login(page);
-
-    // 2. Cerrar sesión
-    await logout(page);
-
-    // 3. Verificar que se volvió a la página de login
-    const LOGIN_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const finalUrl = page.url();
-    if (!finalUrl.includes(LOGIN_URL) || finalUrl.includes('/dashboard')) {
-      throw new Error(`Cierre de sesión fallido. Se esperaba volver a la página de login pero se terminó en ${finalUrl}`);
+    // CAMBIO 3: Leer y parsear el JSON de usuarios del .env
+    const usersJson = process.env.TEST_USERS_JSON;
+    if (!usersJson) {
+      throw new Error('La variable de entorno TEST_USERS_JSON no está definida.');
     }
+    const users = JSON.parse(usersJson);
+    if (users.length === 0) {
+      throw new Error('No se encontraron usuarios de prueba en TEST_USERS_JSON.');
+    }
+    // Usamos el primer usuario para la prueba
+    const testUser = users[0];
 
-    return NextResponse.json({
-      success: true,
-      message: 'Prueba de autenticación (Login y Logout) completada con éxito.'
+    await page.goto(LOGIN_URL, { waitUntil: 'networkidle2' });
+
+    // Login
+    await page.type('#username', testUser.code);
+    await page.type('#password', testUser.password);
+    await page.click('button[type="submit"]');
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+
+    // Verificación de inicio de sesión
+    if (!page.url().startsWith(DASHBOARD_URL)) {
+      throw new Error(`Inicio de sesión fallido. URL actual: ${page.url()}`);
+    }
+    console.log('✅ Inicio de sesión exitoso.');
+
+    // Logout
+    const menuTriggerSelector = 'button[aria-haspopup="menu"]';
+    await page.waitForSelector(menuTriggerSelector);
+    await page.click(menuTriggerSelector);
+    
+    const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
+    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`);
+    if (logoutButton) {
+        await logoutButton.click();
+    } else {
+        throw new Error('No se encontró el botón de "Cerrar sesión".');
+    }
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+
+    // CAMBIO 4: Verificar que el logout fue exitoso
+    if (!page.url().startsWith(LOGIN_URL)) {
+        throw new Error(`Cierre de sesión fallido. URL actual: ${page.url()}`);
+    }
+    console.log('✅ Cierre de sesión exitoso.');
+
+    console.log('✅ Test completado. Tomando captura de pantalla final...');
+    
+    const screenshotBuffer = await page.screenshot({ type: 'png' });
+    const imageBlob = new Blob([new Uint8Array(screenshotBuffer)], { type: 'image/png' });
+
+    return new NextResponse(imageBlob, {
+        status: 200,
+        headers: {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
     });
 
   } catch (error) {
     console.error('❌ Error en la prueba de autenticación:', error);
-
-    
-    if (browser) {
-      try {
-        const pages = await browser.pages();
-        if (pages.length > 0) {
-          await pages[0].screenshot({ path: 'public/error-auth-test.png' });
-          console.log('Captura de pantalla del error guardada en public/error-auth-test.png');
-        }
-      } catch (screenshotError) {
-        console.error('No se pudo tomar la captura de pantalla:', screenshotError);
-      }
-    }
-    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+    // Devolvemos un error en formato JSON para que sea más fácil de depurar
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   } finally {
     if (browser) {
       await browser.close();
