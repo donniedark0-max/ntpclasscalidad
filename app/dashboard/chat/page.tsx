@@ -1,11 +1,14 @@
+"use client"
+
 import DashboardLayout from "@/components/layout/dashboard-layout"
+import ChatPage from "@/components/chat/chat-page"
 
 export default function ChatRoutePage() {
   return (
     <DashboardLayout>
-        <div className="flex h-full w-full items-center justify-center text-2xl font-semibold">
-            Chat Page
-        </div>
+      <div>
+        <ChatPage />
+      </div>
     </DashboardLayout>
   )
 }
