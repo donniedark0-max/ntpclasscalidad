@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getBrowser } from '../../../../lib/puppeteer-browser'; 
 import { Browser } from 'puppeteer';
+import { logout } from '@/lib/puppeteer-helpers';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const LOGIN_URL = `${APP_URL}/`;
@@ -40,37 +41,8 @@ export async function GET() {
     }
     console.log('✅ Inicio de sesión exitoso.');
 
-    // --- LOGOUT ROBUSTO ---
-
-    // 1. Abrir el menú
-    const menuTriggerSelector = 'button[aria-haspopup="menu"]';
-    await page.waitForSelector(menuTriggerSelector, { visible: true });
-    await page.click(menuTriggerSelector);
-    
-    // 2. (CAMBIO CLAVE) Añadir una pequeña espera explícita
-    // Esto da tiempo a que las animaciones del menú terminen.
-    await new Promise(resolve => setTimeout(resolve, 500)); // Espera 500 milisegundos
-
-    // 3. (CAMBIO CLAVE) Usar un selector más tolerante
-    // Este XPath busca un botón que contenga el texto "Cerrar sesión", ignorando mayúsculas/minúsculas y manejando correctamente la tilde.
-    const logoutXPathSelector = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZÓ', 'abcdefghijklmnopqrstuvwxyzó'), 'cerrar sesión')]";
-    
-    // Aumentamos el tiempo de espera por si la red es lenta
-    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { timeout: 10000 }); 
-
-    if (logoutButton) {
-        await logoutButton.click();
-    } else {
-        // Si aún falla, lanzamos el error para saberlo
-        throw new Error('No se encontró el botón de "Cerrar sesión" después de esperar.');
-    }
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
-
-    // Verificar que el logout fue exitoso
-    if (!page.url().startsWith(LOGIN_URL)) {
-        throw new Error(`Cierre de sesión fallido. URL actual: ${page.url()}`);
-    }
-    console.log('✅ Cierre de sesión exitoso.');
+  // Use shared logout helper (selector robusto y espera)
+  await logout(page);
     console.log('✅ Test completado. Tomando captura de pantalla final...');
     
     const screenshotBuffer = await page.screenshot({ type: 'png' });
