@@ -6,10 +6,12 @@ import { Browser } from 'puppeteer';
  * chrome-aws-lambda, o en desarrollo para usar la instalación local de puppeteer.
  */
 export async function getBrowser(): Promise<Browser> {
-  // Cuando el código se ejecuta en Vercel, esta variable de entorno existe.
-  const isProduction = !!process.env.VERCEL_URL;
+  // CAMBIO CLAVE: Usamos process.env.VERCEL, que es más fiable.
+  // Vercel establece esta variable a "1" en todos sus entornos (producción, preview, etc.).
+  const isVercelEnvironment = !!process.env.VERCEL;
 
-  if (isProduction) {
+  if (isVercelEnvironment) {
+    console.log('✅ Entorno de Vercel detectado. Usando puppeteer-core.');
     // Usa la versión ligera para producción
     const puppeteer = (await import('puppeteer-core')).default;
     const chrome = (await import('chrome-aws-lambda')).default;
@@ -20,13 +22,14 @@ export async function getBrowser(): Promise<Browser> {
       headless: chrome.headless,
     });
   } else {
+    console.log('🔵 Entorno local detectado. Usando puppeteer completo.');
     // Usa la versión completa para desarrollo local
     const puppeteer = (await import('puppeteer')).default;
 
     return puppeteer.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
       headless: false,
-      slowMo: 120, // Puedes ajustar la velocidad para ver mejor las pruebas
+      slowMo: 120,
     });
   }
 }

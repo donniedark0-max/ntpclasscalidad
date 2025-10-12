@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getBrowser } from '../../../../lib/puppeteer-browser'; // CAMBIO 1: Importar tu helper
+import { getBrowser } from '../../../../lib/puppeteer-browser'; 
 import { Browser } from 'puppeteer';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
