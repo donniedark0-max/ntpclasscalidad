@@ -98,15 +98,15 @@ export async function GET() {
     await fileInput.uploadFile(filePath);
     console.log('✅ Formulario completado y archivo adjuntado.');
 
-    // --- 3. TOMAR CAPTURA DE PANTALLA (Punto Clave) ---
-    console.log('📸 Tomando captura de pantalla del formulario lleno ANTES de enviarlo...');
-    const screenshotBuffer = await page.screenshot({ type: 'png' });
-
-    // --- 4. ENVIAR FORMULARIO Y VERIFICAR ÉXITO ---
+    // --- 3. ENVIAR FORMULARIO Y VERIFICAR ÉXITO ---
     await page.click("button[type='submit']");
     await page.waitForSelector("div[class*='text-green-700']", { timeout: 15000 });
     console.log('✅ ¡Solicitud enviada con éxito!');
     
+    // --- 4. TOMAR CAPTURA DE PANTALLA (CON EL TICKET VISIBLE) ---
+    console.log('📸 Tomando captura de pantalla con el ticket de confirmación...');
+    const screenshotBuffer = await page.screenshot({ type: 'png' });
+
     // --- 5. CERRAR SESIÓN ---
     const menuTriggerSelector = 'button[aria-haspopup="menu"]';
     console.log('🔍 Buscando el menú de usuario para cerrar sesión...');
