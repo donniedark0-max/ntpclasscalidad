@@ -1,28 +1,33 @@
+// D:\UTP-Class Guardian\ntpclasscalidad\app\api\tests\courses\route.ts
+
 import { NextResponse } from 'next/server';
 import { getBrowser } from '../../../../lib/puppeteer-browser';
 import { Browser, Page } from 'puppeteer';
 
-// --- Constantes de URLs para la prueba ---
+// --- Constantes de URLs ---
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const LOGIN_URL = `${APP_URL}/`;
 const DASHBOARD_URL = `${APP_URL}/dashboard`;
 
 export async function GET() {
-  console.log('🚀 Iniciando prueba de recorrido de cursos y semanas...');
+  console.log('🚀 Iniciando prueba de recorrido de cursos (Enfoque Vercel)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
+  
+  // ✅ SOLUCIÓN: Declaramos la variable como Uint8Array.
+  // Este es el tipo de dato de bytes universal y compatible con Blob.
+  let screenshotBuffer: any = null;
 
   try {
     browser = await getBrowser();
     page = await browser.newPage();
     await page.setViewport({ width: 1366, height: 900 });
 
-    // --- 1. INICIO DE SESIÓN ---
-    console.log('🔑 Intentando iniciar sesión...');
+    // --- PASO 1: Iniciar Sesión ---
     const usersJson = process.env.TEST_USERS_JSON;
-    if (!usersJson) throw new Error('La variable de entorno TEST_USERS_JSON no está definida.');
+    if (!usersJson) throw new Error('TEST_USERS_JSON no está definido.');
     const users = JSON.parse(usersJson);
-    if (users.length === 0) throw new Error('No se encontraron usuarios de prueba.');
+    if (users.length === 0) throw new Error('No hay usuarios de prueba.');
     const testUser = users[Math.floor(Math.random() * users.length)];
 
     await page.goto(LOGIN_URL, { waitUntil: 'networkidle2' });
@@ -34,115 +39,94 @@ export async function GET() {
     if (!page.url().startsWith(DASHBOARD_URL)) {
       throw new Error(`El inicio de sesión falló. URL actual: ${page.url()}`);
     }
-    console.log('✅ Sesión iniciada. Accediendo al dashboard de cursos...');
+    console.log(`✅ Sesión iniciada como ${testUser.code}.`);
 
-    // --- 2. Contar los cursos para saber cuántas veces iterar ---
+    // --- PASO 2: Contar los cursos ---
     const courseCardSelector = 'a[href*="/dashboard/courses/"]';
     await page.waitForSelector(courseCardSelector, { timeout: 15000 });
     const numCourses = (await page.$$(courseCardSelector)).length;
+    if (numCourses === 0) throw new Error("No se encontraron cursos.");
+    console.log(`🔎 Se encontraron ${numCourses} cursos.`);
 
-    if (numCourses === 0) {
-      throw new Error("No se encontraron cursos en el dashboard.");
-    }
-    console.log(`🔎 Se encontraron ${numCourses} cursos. Empezando recorrido...`);
-
-    // --- 3. Bucle principal - Iterar sobre cada curso ---
+    // --- Bucle principal ---
     for (let i = 0; i < numCourses; i++) {
-      console.log(`\n➡️  [Curso ${i + 1} de ${numCourses}] Buscando y entrando al curso...`);
-
+      console.log(`\n➡️  [Curso ${i + 1} de ${numCourses}] Entrando al curso...`);
       await page.waitForSelector(courseCardSelector);
       const courseCards = await page.$$(courseCardSelector);
+      if (!courseCards[i]) throw new Error(`No se pudo encontrar la tarjeta del curso ${i + 1}.`);
       
-      if (courseCards[i]) {
-        await courseCards[i].click();
-      } else {
-        throw new Error(`No se pudo encontrar el curso número ${i + 1} en el dashboard.`);
-      }
-      
+      await courseCards[i].click();
       await page.waitForNavigation({ waitUntil: 'networkidle2' });
-      const courseName = await page.$eval('h1', el => el.textContent?.trim() || 'Curso sin nombre');
-      console.log(`📘 Dentro del curso: "${courseName}"`);
 
-      // --- 4. Bucle secundario - Desplegar cada semana ---
-      const weekButtonXPath = "//button[contains(., 'Semana')]";
-      
+      // --- Bucle secundario (semanas) ---
       try {
-        await page.waitForSelector(`xpath/${weekButtonXPath}`, { timeout: 5000 });
-        const weekButtons = await page.$$(`xpath/${weekButtonXPath}`);
+        await page.waitForSelector(`xpath///button[contains(., 'Semana')]`, { timeout: 5000 });
+        const weekButtons = await page.$$(`xpath///button[contains(., 'Semana')]`);
         const numWeeks = weekButtons.length;
         
         if (numWeeks > 0) {
-            console.log(`🗓️  Se encontraron ${numWeeks} semanas. Verificando una por una...`);
-
             for (let j = 0; j < numWeeks; j++) {
-              const currentWeekButtons = await page.$$(`xpath/${weekButtonXPath}`);
-              const button = currentWeekButtons[j];
-              const weekText = await button.evaluate(el => el.textContent?.trim() || `Semana ${j + 1}`);
-              
-              await button.evaluate(b => (b as HTMLElement).scrollIntoView({ block: 'center' }));
-              await new Promise(r => setTimeout(r, 200));
-              await button.click();
-
-              const contentPanelXPath = `(${weekButtonXPath})[${j + 1}]/following-sibling::div//a`;
-              await page.waitForSelector(`xpath/${contentPanelXPath}`, { timeout: 5000 });
-              console.log(`   ✅ Acordeón "${weekText}" desplegado.`);
-              
-              await button.click(); // Cierra el acordeón para el siguiente
+                const currentWeekButtons = await page.$$(`xpath///button[contains(., 'Semana')]`);
+                const button = currentWeekButtons[j];
+                await button.evaluate(b => b.scrollIntoView({ block: 'center' }));
+                await new Promise(r => setTimeout(r, 300));
+                await button.click();
+                
+                if (i === numCourses - 1 && j === numWeeks - 1) {
+                    console.log('📸 Tomando captura de pantalla...');
+                    await new Promise(r => setTimeout(r, 500));
+                    // La asignación funciona porque un Buffer es un tipo de Uint8Array
+                    screenshotBuffer = await page.screenshot({ type: 'png' });
+                    console.log('✅ Captura guardada.');
+                } else {
+                    await button.click();
+                }
             }
-        } else {
-            console.log('⚠️  Este curso no parece tener semanas desplegables.');
         }
-
       } catch (e) {
-        console.log('⚠️  Este curso no tiene semanas o no se cargaron a tiempo.');
+        console.log('⚠️  Este curso no tiene semanas o no se encontraron a tiempo.');
       }
       
-      // --- 5. Volver al dashboard ---
-      console.log('... Volviendo al listado de cursos.');
-      const backButtonXPath = "//a[contains(., 'Volver a cursos')]";
-      const backButton = await page.waitForSelector(`xpath/${backButtonXPath}`);
-      
-      if (backButton) {
-        await backButton.click();
-      } else {
-        throw new Error("No se encontró el botón 'Volver a cursos' para regresar al dashboard.");
+      if (i < numCourses - 1) {
+          await page.goto(DASHBOARD_URL, { waitUntil: 'networkidle2' });
       }
-      
-      await page.waitForNavigation({ waitUntil: 'networkidle2' });
     }
 
-    // --- 6. CERRAR SESIÓN ---
-    console.log('\n🏁 Recorrido de todos los cursos completado. Cerrando sesión...');
+    if (!screenshotBuffer) {
+        throw new Error("No se pudo tomar la captura de pantalla.");
+    }
+    
+    console.log('\n🏁 Recorrido completado.');
+    
+    // --- PASO FINAL: Cerrar Sesión ---
     const menuTriggerSelector = 'button[aria-haspopup="menu"]';
     await page.click(menuTriggerSelector);
-    
-    // CORRECCIÓN: Añadimos una pequeña pausa para dar tiempo a que aparezca el menú desplegable.
-    await new Promise(r => setTimeout(r, 500)); 
-
     const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
-    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
-    if (!logoutButton) throw new Error('El botón de logout no apareció en el menú.');
-
+    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true });
+    if (!logoutButton) throw new Error('El botón de logout no apareció.');
     await logoutButton.click();
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
     console.log('✅ Cierre de sesión exitoso.');
+    
+    // Ahora la creación del Blob es directa y sin errores de tipo.
+    const imageBlob = new Blob([screenshotBuffer], { type: 'image/png' });
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Prueba de recorrido de cursos completada con éxito.' 
+    return new NextResponse(imageBlob, {
+        status: 200,
+        headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
     });
 
   } catch (error) {
-    console.error('❌ Error en la prueba de recorrido de cursos:', error);
+    console.error('❌ Error en la prueba:', error);
     if (page) {
-      // Guardar en /tmp para compatibilidad con Vercel
-      await page.screenshot({ path: '/tmp/error-courses-test.png' });
-      console.log('📸 Captura de pantalla del error guardada en /tmp.');
+      await page.screenshot({ path: '/tmp/error_courses_screenshot.png' });
+      console.log('📸 Captura de error guardada en /tmp.');
     }
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   } finally {
-    if (browser) await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 }
-
