@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server'; // Importar NextRequest
 import { getBrowser } from '../../../../lib/puppeteer-browser';
 import { Browser } from 'puppeteer';
 
@@ -6,7 +6,8 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const LOGIN_URL = `${APP_URL}/`;
 const DASHBOARD_URL = `${APP_URL}/dashboard`;
 
-export async function GET() {
+// La función ahora recibe 'request' para poder leer la URL
+export async function GET(request: NextRequest) { 
   let browser: Browser | null = null;
   let page: any = null;
 
@@ -17,10 +18,22 @@ export async function GET() {
 
     const usersJson = process.env.TEST_USERS_JSON;
     if (!usersJson) throw new Error('TEST_USERS_JSON no está definida.');
-  const users = JSON.parse(usersJson);
-  if (users.length === 0) throw new Error('No hay usuarios de prueba.');
-  // Selección aleatoria de usuario para la prueba
-  const testUser = users[Math.floor(Math.random() * users.length)];
+    const users = JSON.parse(usersJson);
+    if (users.length === 0) throw new Error('No hay usuarios de prueba.');
+
+    // --- CAMBIO CLAVE: LEER EL PARÁMETRO DE LA URL ---
+    const searchParams = request.nextUrl.searchParams;
+    // Obtiene 'userIndex' de la URL, si no existe, usa 0 por defecto.
+    const userIndex = parseInt(searchParams.get('userIndex') || '0', 10);
+
+    // Validar que el índice sea correcto
+    if (userIndex < 0 || userIndex >= users.length) {
+      throw new Error(`El índice de usuario '${userIndex}' es inválido. Hay ${users.length} usuarios disponibles (índices 0 a ${users.length - 1}).`);
+    }
+
+    const testUser = users[userIndex];
+    console.log(`🚀 Ejecutando test para el usuario #${userIndex}: ${testUser.code}`);
+    // --- FIN DEL CAMBIO ---
 
     await page.goto(LOGIN_URL, { waitUntil: 'networkidle2' });
 
@@ -31,32 +44,23 @@ export async function GET() {
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
     if (!page.url().startsWith(DASHBOARD_URL)) {
-      throw new Error(`Inicio de sesión fallido. URL actual: ${page.url()}`);
+      throw new Error(`Inicio de sesión fallido para ${testUser.code}. URL actual: ${page.url()}`);
     }
     console.log('✅ Inicio de sesión exitoso.');
 
-    // --- 1. ESPERAR A QUE EL HEADER CARGUE COMPLETAMENTE ---
-    // Basado en tu código de Header.tsx, esperamos a que el nombre del usuario (en un span con font-bold) sea visible.
-    // Esto significa que el estado 'loading' ha terminado y la API ha respondido.
-    console.log('⏳ Esperando que cargue el nombre del usuario en el header...');
+    // Esperar a que el header cargue completamente el nombre del usuario
     const userNameSelector = 'header p.text-sm span.font-bold';
     await page.waitForSelector(userNameSelector, { visible: true, timeout: 15000 });
+    console.log('👤 Nombre de usuario cargado.');
     
-    console.log('👤 Nombre de usuario cargado. ¡El dashboard está completamente renderizado!');
-    
-    // --- 2. TOMAR LA CAPTURA DE PANTALLA DE ÉXITO ---
-    // Este es el momento perfecto para la captura, ya que prueba que el login y la carga de datos funcionan.
-    console.log('📸 Tomando captura de pantalla del dashboard cargado...');
+    // Tomar la captura de pantalla del dashboard
     const screenshotBuffer = await page.screenshot({ type: 'png' });
 
-    // --- 3. PROCEDER CON EL LOGOUT ---
+    // Proceder con el Logout
     const menuTriggerSelector = 'button[aria-haspopup="menu"]';
-    console.log('🔍 Buscando el menú de usuario para cerrar sesión...');
     await page.click(menuTriggerSelector);
 
-    // Esperamos a que el botón "Cerrar sesión" aparezca en el menú desplegable.
     const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
-    console.log('⏳ Esperando que aparezca el botón "Cerrar sesión"...');
     const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
     
     if (!logoutButton) {
@@ -70,9 +74,7 @@ export async function GET() {
       throw new Error(`Cierre de sesión fallido. La URL final es: ${page.url()}`);
     }
     console.log('✅ Cierre de sesión exitoso.');
-    console.log('✅ Test de ciclo completo (Login y Logout) finalizado.');
 
-    // Devolvemos la captura del dashboard que tomamos antes.
     const imageBlob = new Blob([new Uint8Array(screenshotBuffer)], { type: 'image/png' });
 
     return new NextResponse(imageBlob, {
