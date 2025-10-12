@@ -48,9 +48,9 @@ export async function GET() {
     console.log('🖱️ Haciendo clic en el botón del menú...');
     await page.click(menuTriggerSelector);
     
-    // 2. Esperar un momento a que la animación del menú termine.
-    // Aumentamos el tiempo a 1 segundo por si Vercel es lento.
-    await page.waitForTimeout(1000);
+  // 2. Esperar un momento a que la animación del menú termine.
+  // Aumentamos el tiempo a 1 segundo por si Vercel es lento.
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
     // 3. (PARA DEPURAR) Tomar una captura para ver si el menú se abrió.
     console.log('📸 Tomando captura para verificar que el menú se abrió...');
