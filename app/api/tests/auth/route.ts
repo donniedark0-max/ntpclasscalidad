@@ -17,9 +17,10 @@ export async function GET() {
 
     const usersJson = process.env.TEST_USERS_JSON;
     if (!usersJson) throw new Error('TEST_USERS_JSON no está definida.');
-    const users = JSON.parse(usersJson);
-    if (users.length === 0) throw new Error('No hay usuarios de prueba.');
-    const testUser = users[0];
+  const users = JSON.parse(usersJson);
+  if (users.length === 0) throw new Error('No hay usuarios de prueba.');
+  // Selección aleatoria de usuario para la prueba
+  const testUser = users[Math.floor(Math.random() * users.length)];
 
     await page.goto(LOGIN_URL, { waitUntil: 'networkidle2' });
 
