@@ -6,7 +6,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const LOGIN_URL = `${APP_URL}/`;
 const DASHBOARD_URL = `${APP_URL}/dashboard`;
 
-// La función ahora recibe 'request' para poder leer la URL
+// La función ahora recibe 'request', aunque no la usamos para parámetros de URL, la mantenemos por la firma de Next.js
 export async function GET(request: NextRequest) { 
   let browser: Browser | null = null;
   let page: any = null;
@@ -18,21 +18,16 @@ export async function GET(request: NextRequest) {
 
     const usersJson = process.env.TEST_USERS_JSON;
     if (!usersJson) throw new Error('TEST_USERS_JSON no está definida.');
+    
     const users = JSON.parse(usersJson);
     if (users.length === 0) throw new Error('No hay usuarios de prueba.');
 
-    // --- CAMBIO CLAVE: LEER EL PARÁMETRO DE LA URL ---
-    const searchParams = request.nextUrl.searchParams;
-    // Obtiene 'userIndex' de la URL, si no existe, usa 0 por defecto.
-    const userIndex = parseInt(searchParams.get('userIndex') || '0', 10);
-
-    // Validar que el índice sea correcto
-    if (userIndex < 0 || userIndex >= users.length) {
-      throw new Error(`El índice de usuario '${userIndex}' es inválido. Hay ${users.length} usuarios disponibles (índices 0 a ${users.length - 1}).`);
-    }
-
-    const testUser = users[userIndex];
-    console.log(`🚀 Ejecutando test para el usuario #${userIndex}: ${testUser.code}`);
+    // --- CAMBIO CLAVE: SELECCIÓN ALEATORIA DE USUARIO ---
+    // Selecciona un índice aleatorio basado en la longitud del array de usuarios
+    const randomIndex = Math.floor(Math.random() * users.length);
+    const testUser = users[randomIndex];
+    
+    console.log(`🚀 Ejecutando test para el usuario (aleatorio) #${randomIndex}: ${testUser.code}`);
     // --- FIN DEL CAMBIO ---
 
     await page.goto(LOGIN_URL, { waitUntil: 'networkidle2' });
@@ -61,6 +56,8 @@ export async function GET(request: NextRequest) {
     await page.click(menuTriggerSelector);
 
     const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
+    // Usa page.waitForXPath si estás buscando por XPath sin el prefijo,
+    // pero como ya tienes el selector con 'xpath/' es mejor usar el selector que ya tenías:
     const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
     
     if (!logoutButton) {
@@ -85,8 +82,9 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('❌ Error en la prueba de autenticación:', error);
     if (page) {
+      // Nota: '/tmp/error_screenshot.png' es específico de sistemas *NIX o entornos con acceso a /tmp
       await page.screenshot({ path: '/tmp/error_screenshot.png' });
-      console.log('📸 Captura de pantalla del error guardada.');
+      console.log('📸 Captura de pantalla del error guardada en /tmp/error_screenshot.png.');
     }
     const errorMessage = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
