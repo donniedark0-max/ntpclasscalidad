@@ -57,16 +57,16 @@ export async function GET() {
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // 4. Buscar el botón de logout.
-    const logoutXPathSelector = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZÓ', 'abcdefghijklmnopqrstuvwxyzó'), 'cerrar sesión')]";
-    console.log('🔍 Buscando el botón de "Cerrar sesión"...');
+    const logoutXPathSelector = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZÓ', 'abcdefghijklmnopqrstuvwxyzó'), 'Logout')]";
+    console.log('🔍 Buscando el botón de "Logout"...');
     const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
 
     if (logoutButton) {
-      console.log('🖱️ Haciendo clic en "Cerrar sesión"...');
+      console.log('🖱️ Haciendo clic en "Logout"...');
       await logoutButton.click();
     } else {
       // Este error ya no debería ocurrir, pero lo dejamos por seguridad.
-      throw new Error('El botón de "Cerrar sesión" nunca apareció.');
+      throw new Error('El botón de "Logout" nunca apareció.');
     }
     
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
