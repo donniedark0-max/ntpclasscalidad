@@ -8,20 +8,17 @@ const DASHBOARD_URL = `${APP_URL}/dashboard`;
 
 export async function GET() {
   let browser: Browser | null = null;
+  let page: any = null; // Definir page aquí para acceder en catch
 
   try {
     browser = await getBrowser();
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
 
     const usersJson = process.env.TEST_USERS_JSON;
-    if (!usersJson) {
-      throw new Error('La variable de entorno TEST_USERS_JSON no está definida.');
-    }
+    if (!usersJson) throw new Error('TEST_USERS_JSON no está definida.');
     const users = JSON.parse(usersJson);
-    if (users.length === 0) {
-      throw new Error('No se encontraron usuarios de prueba en TEST_USERS_JSON.');
-    }
+    if (users.length === 0) throw new Error('No hay usuarios de prueba.');
     const testUser = users[0];
 
     await page.goto(LOGIN_URL, { waitUntil: 'networkidle2' });
@@ -33,28 +30,31 @@ export async function GET() {
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
     if (!page.url().startsWith(DASHBOARD_URL)) {
-      await page.screenshot({ path: '/tmp/login_failed.png' });
-      throw new Error(`Inicio de sesión fallido. Se tomó captura en /tmp/login_failed.png. URL actual: ${page.url()}`);
+      throw new Error(`Inicio de sesión fallido. URL actual: ${page.url()}`);
     }
     console.log('✅ Inicio de sesión exitoso.');
 
-    // --- LOGOUT A PRUEBA DE FALLOS ---
+    // --- LOGOUT A PRUEBA DE FALLOS EN VERCEL ---
 
-    // 1. Esperar a que el botón del menú esté visible y listo para el clic.
+    // 1. Encontrar el botón del menú de forma explícita.
     const menuTriggerSelector = 'button[aria-haspopup="menu"]';
-    console.log('🔍 Esperando el botón del menú de usuario...');
-    await page.waitForSelector(menuTriggerSelector, { visible: true, timeout: 15000 });
+    console.log('🔍 Esperando que el botón del menú de usuario sea visible...');
+    const menuTrigger = await page.waitForSelector(menuTriggerSelector, { visible: true, timeout: 20000 });
     
-    console.log('🖱️ Haciendo clic en el botón del menú...');
-    await page.click(menuTriggerSelector);
-    
-  // 2. Esperar un momento a que la animación del menú termine.
-  // Aumentamos el tiempo a 1 segundo por si Vercel es lento.
-  await new Promise(resolve => setTimeout(resolve, 1000));
+    if (!menuTrigger) {
+        throw new Error('No se encontró el botón para abrir el menú de usuario.');
+    }
 
-    // 3. (PARA DEPURAR) Tomar una captura para ver si el menú se abrió.
-    console.log('📸 Tomando captura para verificar que el menú se abrió...');
-    await page.screenshot({ path: '/tmp/menu_opened.png' });
+    // 2. (CAMBIO CLAVE) Usar page.evaluate para hacer clic con JavaScript.
+    // Esto es mucho más fiable en entornos headless que un clic simulado.
+    console.log('🖱️ Forzando clic en el botón del menú con page.evaluate...');
+    await page.evaluate((selector: string) => {
+        const element = document.querySelector(selector) as HTMLElement;
+        if (element) element.click();
+    }, menuTriggerSelector);
+
+    // 3. Aumentar la espera para animaciones en Vercel.
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     // 4. Buscar el botón de logout.
     const logoutXPathSelector = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZÓ', 'abcdefghijklmnopqrstuvwxyzó'), 'cerrar sesión')]";
@@ -65,7 +65,8 @@ export async function GET() {
       console.log('🖱️ Haciendo clic en "Cerrar sesión"...');
       await logoutButton.click();
     } else {
-      throw new Error('El botón de "Cerrar sesión" nunca se hizo visible.');
+      // Este error ya no debería ocurrir, pero lo dejamos por seguridad.
+      throw new Error('El botón de "Cerrar sesión" nunca apareció.');
     }
     
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
@@ -81,21 +82,17 @@ export async function GET() {
 
     return new NextResponse(imageBlob, {
         status: 200,
-        headers: {
-            'Content-Type': 'image/png',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
+        headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
     });
 
   } catch (error) {
     console.error('❌ Error en la prueba de autenticación:', error);
-    if (browser) {
-      const page = (await browser.pages())[0];
-      if (page) {
-        // (CRUCIAL) Tomar una captura en el momento exacto del error.
-        await page.screenshot({ path: '/tmp/error_screenshot.png' });
-        console.log('📸 Captura de pantalla del error guardada. Revisa los logs.');
-      }
+    if (page) {
+      // (CRUCIAL) Si todo falla, imprime el HTML en los logs.
+      const pageContent = await page.content();
+      console.log('================= INICIO DEL HTML DE LA PÁGINA CON ERROR =================');
+      console.log(pageContent);
+      console.log('================== FIN DEL HTML DE LA PÁGINA CON ERROR ==================');
     }
     const errorMessage = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
