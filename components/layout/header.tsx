@@ -127,7 +127,7 @@ export default function Header() {
                     }
                   }}
                 >
-                  Logout
+                  Cerrar sesión
                 </button>
               </div>
             </div>

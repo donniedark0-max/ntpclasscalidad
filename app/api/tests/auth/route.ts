@@ -8,7 +8,7 @@ const DASHBOARD_URL = `${APP_URL}/dashboard`;
 
 export async function GET() {
   let browser: Browser | null = null;
-  let page: any = null; // Definir page aquí para acceder en catch
+  let page: any = null;
 
   try {
     browser = await getBrowser();
@@ -23,7 +23,6 @@ export async function GET() {
 
     await page.goto(LOGIN_URL, { waitUntil: 'networkidle2' });
 
-    // Login
     await page.type('#username', testUser.code);
     await page.type('#password', testUser.password);
     await page.click('button[type="submit"]');
@@ -34,40 +33,30 @@ export async function GET() {
     }
     console.log('✅ Inicio de sesión exitoso.');
 
-    // --- LOGOUT A PRUEBA DE FALLOS EN VERCEL ---
+    // --- LOGOUT ROBUSTO (VERSIÓN FINAL) ---
 
-    // 1. Encontrar el botón del menú de forma explícita.
+    // 1. Localizar y hacer clic en el botón que abre el menú.
     const menuTriggerSelector = 'button[aria-haspopup="menu"]';
-    console.log('🔍 Esperando que el botón del menú de usuario sea visible...');
-    const menuTrigger = await page.waitForSelector(menuTriggerSelector, { visible: true, timeout: 20000 });
+    console.log('🔍 Esperando el botón del menú de usuario...');
+    await page.waitForSelector(menuTriggerSelector, { visible: true, timeout: 20000 });
     
-    if (!menuTrigger) {
-        throw new Error('No se encontró el botón para abrir el menú de usuario.');
+    console.log('🖱️ Haciendo clic en el botón del menú...');
+    await page.click(menuTriggerSelector); // Un click normal es suficiente aquí.
+
+    // 2. (CAMBIO CRÍTICO) Esperar DIRECTAMENTE por el botón de logout.
+    // Esta es la "espera inteligente". Puppeteer sondeará el DOM hasta que el
+    // menú se renderice y el botón aparezca, o hasta que se agote el tiempo.
+    const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
+    console.log('⏳ Esperando que aparezca el botón "Cerrar sesión" en el menú...');
+    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 15000 });
+
+    // 3. Si el botón fue encontrado, hacer clic en él.
+    if (!logoutButton) {
+      throw new Error('El botón de "Cerrar sesión" nunca apareció después de hacer clic en el menú.');
     }
-
-    // 2. (CAMBIO CLAVE) Usar page.evaluate para hacer clic con JavaScript.
-    // Esto es mucho más fiable en entornos headless que un clic simulado.
-    console.log('🖱️ Forzando clic en el botón del menú con page.evaluate...');
-    await page.evaluate((selector: string) => {
-        const element = document.querySelector(selector) as HTMLElement;
-        if (element) element.click();
-    }, menuTriggerSelector);
-
-    // 3. Aumentar la espera para animaciones en Vercel.
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // 4. Buscar el botón de logout.
-    const logoutXPathSelector = "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZÓ', 'abcdefghijklmnopqrstuvwxyzó'), 'Logout')]";
-    console.log('🔍 Buscando el botón de "Logout"...');
-    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
-
-    if (logoutButton) {
-      console.log('🖱️ Haciendo clic en "Logout"...');
-      await logoutButton.click();
-    } else {
-      // Este error ya no debería ocurrir, pero lo dejamos por seguridad.
-      throw new Error('El botón de "Logout" nunca apareció.');
-    }
+    
+    console.log('🖱️ Haciendo clic en "Cerrar sesión"...');
+    await logoutButton.click();
     
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
@@ -78,7 +67,7 @@ export async function GET() {
     console.log('✅ Test completado. Tomando captura de pantalla final...');
     
     const screenshotBuffer = await page.screenshot({ type: 'png' });
-    const imageBlob = new Blob([new Uint8Array(screenshotBuffer)], { type: 'image/png' });
+    const imageBlob = new Blob([new Uint8Array(screenshotBuffer)], { type: 'png' });
 
     return new NextResponse(imageBlob, {
         status: 200,
@@ -88,7 +77,6 @@ export async function GET() {
   } catch (error) {
     console.error('❌ Error en la prueba de autenticación:', error);
     if (page) {
-      // (CRUCIAL) Si todo falla, imprime el HTML en los logs.
       const pageContent = await page.content();
       console.log('================= INICIO DEL HTML DE LA PÁGINA CON ERROR =================');
       console.log(pageContent);
