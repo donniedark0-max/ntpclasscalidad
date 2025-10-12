@@ -23,8 +23,8 @@ type Message = {
 type ChatWindowProps = {
   chatId: string
   currentUser: User | null
+  otherUser?: User | undefined
 }
-
 export default function ChatWindow({ chatId, currentUser, otherUser }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState("")
@@ -153,13 +153,14 @@ export default function ChatWindow({ chatId, currentUser, otherUser }: ChatWindo
 
       {/* Input for message and attachment */}
       <form onSubmit={handleSend} className="flex items-center gap-2 border-t p-3 bg-white">
-        <label className="cursor-pointer">
+        <label className="cursor-pointer" aria-label="Adjuntar archivo">
           <Paperclip className="h-5 w-5 text-gray-500" />
           <input
             type="file"
             className="hidden"
             onChange={handleFileChange}
             disabled={sending}
+            aria-label="Seleccionar archivo para adjuntar"
           />
         </label>
         {file && (
@@ -169,6 +170,7 @@ export default function ChatWindow({ chatId, currentUser, otherUser }: ChatWindo
           type="text"
           className="flex-1 rounded border px-3 py-2 text-sm"
           placeholder="Escribe un mensaje..."
+          aria-label="Mensaje"
           value={newMessage}
           onChange={e => setNewMessage(e.target.value)}
           disabled={sending}
@@ -177,7 +179,9 @@ export default function ChatWindow({ chatId, currentUser, otherUser }: ChatWindo
           type="submit"
           className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
           disabled={sending || (!newMessage.trim() && !file)}
+          aria-label="Enviar mensaje"
         >
+          <span className="sr-only">Enviar mensaje</span>
           <Send className="h-5 w-5" />
         </button>
       </form>

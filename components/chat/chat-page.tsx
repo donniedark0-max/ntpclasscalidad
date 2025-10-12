@@ -48,6 +48,7 @@ export default function ChatPage() {
   // Fetch chats for current user
   useEffect(() => {
     if (!currentUser) return
+    const uid = currentUser.uid
     let unsub: any = null
     async function fetchChats() {
       const firestore = await getFirebaseFirestore()
@@ -55,7 +56,7 @@ export default function ChatPage() {
       const db = getFirestore()
       const q = query(
         collection(db, "chats"),
-        where("users", "array-contains", currentUser.uid),
+        where("users", "array-contains", uid),
         orderBy("updatedAt", "desc")
       )
       unsub = onSnapshot(q, (snapshot: any) => {
