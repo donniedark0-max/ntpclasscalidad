@@ -68,7 +68,6 @@ export async function GET() {
       
       try {
         await page.waitForSelector(`xpath/${weekButtonXPath}`, { timeout: 5000 });
-        // CORRECCIÓN: Usamos page.$$ con el prefijo xpath/ en lugar de page.$x
         const weekButtons = await page.$$(`xpath/${weekButtonXPath}`);
         const numWeeks = weekButtons.length;
         
@@ -76,7 +75,6 @@ export async function GET() {
             console.log(`🗓️  Se encontraron ${numWeeks} semanas. Verificando una por una...`);
 
             for (let j = 0; j < numWeeks; j++) {
-              // CORRECCIÓN: Usamos page.$$ con el prefijo xpath/ en lugar de page.$x
               const currentWeekButtons = await page.$$(`xpath/${weekButtonXPath}`);
               const button = currentWeekButtons[j];
               const weekText = await button.evaluate(el => el.textContent?.trim() || `Semana ${j + 1}`);
@@ -118,6 +116,9 @@ export async function GET() {
     const menuTriggerSelector = 'button[aria-haspopup="menu"]';
     await page.click(menuTriggerSelector);
     
+    // CORRECCIÓN: Añadimos una pequeña pausa para dar tiempo a que aparezca el menú desplegable.
+    await new Promise(r => setTimeout(r, 500)); 
+
     const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
     const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
     if (!logoutButton) throw new Error('El botón de logout no apareció en el menú.');
