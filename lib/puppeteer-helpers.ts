@@ -56,10 +56,10 @@ export async function logout(page: Page) {
   await page.waitForSelector(menuTriggerSelector);
   await page.click(menuTriggerSelector);
 
-  const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
+  const logoutXPathSelector = "//button[contains(., 'Logout')]";
   const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`);
   if (!logoutButton) {
-    throw new Error('No se pudo encontrar el botón de "Cerrar sesión".');
+    throw new Error('No se pudo encontrar el botón de "Logout".');
   }
   await logoutButton.click();
   await page.waitForNavigation({ waitUntil: 'networkidle2' });
