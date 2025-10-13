@@ -301,46 +301,75 @@ export async function GET(request: Request) {
     
     // -- Editar y Guardar Celular --
     const phoneInputSelector = 'input[aria-label="Celular"]';
-    // Wait for either the standard aria-label input or some alternative selectors
+    // Wait options after clicking
     const possiblePhoneInputs = [
       '[data-testid="profile-celular-input"]',
       phoneInputSelector,
       "xpath///input[contains(@aria-label, 'Celular')]",
       "xpath///input[contains(@placeholder, 'Celular')]",
     ];
-    const foundPhoneSel = await waitForAnySelector(page, possiblePhoneInputs, { visible: true, timeout: 30000 });
-    // Click edit and find the input inside the same panel (returns XPath)
-    let inputXPath: string | null = null;
+
+    // First, click Edit and try to obtain the input XPath inside the panel
+    let inputSel: string | null = null; // may be a css selector or xpath///...
     try {
-      inputXPath = await clickEditAndFindInputXPath(page, foundEditSel, 10000);
-      console.log('✅ Input XPath encontrado en el panel editado:', inputXPath);
-      // save a screenshot immediately after click
+      const xpath = await clickEditAndFindInputXPath(page, foundEditSel, 10000);
+      console.log('✅ Input XPath encontrado en el panel editado:', xpath);
+      inputSel = `xpath///${xpath}`;
       try { await page.screenshot({ path: '/tmp/profile_after_edit_click.png' }); console.log('📸 Captura tras click en Editar guardada en /tmp/profile_after_edit_click.png'); } catch(e){/*ignore*/}
     } catch (err) {
-      console.warn('⚠️ No se pudo localizar input relativo al botón Edit (fallback a selectors globales):', err);
-      // fallback: use previously found selector
-      inputXPath = foundPhoneSel.startsWith('xpath') ? foundPhoneSel.replace(/^xpath\/\/\/?/, '') : null;
+      console.warn('⚠️ clickEditAndFindInputXPath falló (intentaremos click robusto + esperar selectores comunes):', err);
+      // Ensure we clicked the Edit button (robust click)
+      try {
+        if (foundEditSel.startsWith('xpath')) {
+          const inner = foundEditSel.replace(/^xpath\/\/\/?/, '');
+          await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.scrollIntoView({behavior:'auto', block:'center'}); el?.click(); }, inner);
+        } else {
+          await page.waitForSelector(foundEditSel, { visible: true, timeout: 5000 });
+          await page.click(foundEditSel);
+        }
+      } catch (e) {
+        console.warn('⚠️ No se pudo clickear el Edit en el fallback:', e);
+      }
+
+      // After clicking, wait for one of the known input selectors to appear
+      try {
+        const sel = await waitForAnySelector(page, possiblePhoneInputs, { visible: true, timeout: 10000 });
+        inputSel = sel;
+        console.log('✅ Selector de input detectado tras click:', sel);
+      } catch (e) {
+        console.warn('⚠️ No aparecieron los selectores esperados tras click:', e);
+        inputSel = null;
+      }
     }
 
-    if (inputXPath) {
-      // Write using the XPath we obtained
-      await clearAndType(page, `xpath///${inputXPath}`, newPhone);
-      // Click the Save button relative to that input: ancestor::div[2] pattern
-      const saveRelXPath = `xpath///${inputXPath}/ancestor::div[2]//button[text()='Guardar']`;
-      try {
-        await page.waitForSelector(`xpath/${inputXPath}`, { visible: true, timeout: 2000 });
-        await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.click(); }, saveRelXPath.replace(/^xpath\/\/\/?/, ''));
-      } catch (e) {
-        // fallback: try a generic Save button
-        try { await page.click("xpath///button[text()='Guardar']"); } catch (_) { /* ignore */ }
+    // If we have an inputSel, write into it properly (supports xpath/// or css)
+    if (inputSel) {
+      if (inputSel.startsWith('xpath')) {
+        await clearAndType(page, inputSel, newPhone);
+        // try to click Save relative to xpath
+        const xpathInner = inputSel.replace(/^xpath\/\/\/?/, '');
+        const saveRelXPath = `xpath///${xpathInner}/ancestor::div[2]//button[text()='Guardar']`;
+        try {
+          await page.waitForSelector(`xpath/${xpathInner}`, { visible: true, timeout: 2000 });
+          await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.click(); }, saveRelXPath.replace(/^xpath\/\/\/?/, ''));
+        } catch (e) {
+          try { await page.click("xpath///button[text()='Guardar']"); } catch (_) { /* ignore */ }
+        }
+      } else {
+        // css selector
+        await clearAndType(page, inputSel, newPhone);
+        try { await page.click('[data-testid="profile-celular-save"]'); } catch (_) {
+          try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {}
+        }
       }
     } else {
-      // Final fallback: use global CSS selector path
-      await clearAndType(page, phoneInputSelector, newPhone);
-      await page.click("xpath///button[text()='Guardar']");
+      // Final fallback: use global CSS selector path without prior click
+      await clearAndType(page, phoneInputSelector, newPhone).catch(() => {});
+      try { await page.click("xpath///button[text()='Guardar']"); } catch (_) { /* ignore */ }
     }
 
     await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
+    console.log(` > Celular actualizado a ${newPhone}`);
     console.log(` > Celular actualizado a ${newPhone}`);
 
     // -- Editar y Guardar Correo --
