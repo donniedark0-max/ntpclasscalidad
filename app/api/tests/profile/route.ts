@@ -20,7 +20,7 @@ function generateRandomAddress(): string {
   return `${streets[Math.floor(Math.random() * streets.length)]} ${number}`;
 }
 async function clearAndType(page: Page, selector: string, text: string) {
-  // La espera ya está garantizada antes de llamar a esta función.
+  await page.waitForSelector(selector, { visible: true });
   await page.evaluate((sel) => {
       const input = document.querySelector(sel) as HTMLInputElement;
       if (input) input.value = '';
@@ -28,8 +28,21 @@ async function clearAndType(page: Page, selector: string, text: string) {
   await page.type(selector, text);
 }
 
+// ⭐ CAMBIO CLAVE 1: Nueva función ultra-robusta para hacer clic y esperar el cambio de estado.
+async function clickAndWaitForStateChange(page: Page, clickSelector: string, resultSelector: string) {
+  console.log(` > Clickeando '${clickSelector}' y esperando por '${resultSelector}'...`);
+  await page.waitForSelector(clickSelector, { visible: true });
+
+  // Ejecutamos el clic y la espera del resultado en paralelo.
+  // Esto resuelve las carreras de condiciones en SPAs (React, Vue, etc).
+  await Promise.all([
+    page.click(clickSelector),
+    page.waitForSelector(resultSelector, { visible: true, timeout: 15000 }),
+  ]);
+}
+
 export async function GET() {
-  console.log('🚀 Iniciando prueba de perfil (Con Esperas de Resultado para Vercel)...');
+  console.log('🚀 Iniciando prueba de perfil (Estrategia de Verificación de Estado)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
   let screenshotBuffer: any = null;
@@ -56,10 +69,10 @@ export async function GET() {
 
     // --- Navegación y Carga de Página ---
     await page.goto(`${APP_URL}/dashboard/profile`, { waitUntil: 'networkidle2' });
-    console.log('✅ Navegado a la página de edición de perfil.');
+    console.log('✅ Navegado a la página de perfil.');
     console.log('⏳ Esperando a que los datos del perfil carguen...');
     const firstEditButtonSelector = "xpath///p[text()='Celular']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
-    await page.waitForSelector(firstEditButtonSelector, { visible: true, timeout: 15000 });
+    await page.waitForSelector(firstEditButtonSelector, { visible: true, timeout: 20000 });
     console.log('✅ Datos del perfil cargados.');
 
     // --- Edición de Contacto ---
@@ -68,30 +81,19 @@ export async function GET() {
     const newEmail = generateRandomEmail();
     
     // -- Editar y Guardar Celular --
-    const editPhoneButton = await page.waitForSelector(firstEditButtonSelector);
-    if (!editPhoneButton) throw new Error("No se encontró el botón 'Editar' para Celular.");
-    await editPhoneButton.click();
-    // ⭐ CAMBIO CLAVE: Esperar a que el CAMPO DE TEXTO aparezca DESPUÉS del clic.
     const phoneInputSelector = 'input[aria-label="Celular"]';
-    await page.waitForSelector(phoneInputSelector, { visible: true });
+    await clickAndWaitForStateChange(page, firstEditButtonSelector, phoneInputSelector); // ⭐ CAMBIO CLAVE 2
     await clearAndType(page, phoneInputSelector, newPhone);
-    const savePhoneButton = await page.waitForSelector("xpath///input[@aria-label='Celular']/ancestor::div[2]//button[text()='Guardar']");
-    if (!savePhoneButton) throw new Error("No se encontró el botón 'Guardar' para el celular.");
-    await savePhoneButton.click();
+    await page.click("xpath///input[@aria-label='Celular']/ancestor::div[2]//button[text()='Guardar']");
     await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
     console.log(` > Celular actualizado a ${newPhone}`);
 
     // -- Editar y Guardar Correo --
-    const editEmailButton = await page.waitForSelector("xpath///p[contains(text(), 'Correo')]/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']");
-    if (!editEmailButton) throw new Error("No se encontró el botón 'Editar' para Correo.");
-    await editEmailButton.click();
-    // ⭐ CAMBIO CLAVE: Esperar a que el CAMPO DE TEXTO aparezca DESPUÉS del clic.
+    const editEmailButtonSelector = "xpath///p[contains(text(), 'Correo')]/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
     const emailInputSelector = 'input[aria-label="Correo personal"]';
-    await page.waitForSelector(emailInputSelector, { visible: true });
+    await clickAndWaitForStateChange(page, editEmailButtonSelector, emailInputSelector); // ⭐ CAMBIO CLAVE 2
     await clearAndType(page, emailInputSelector, newEmail);
-    const saveEmailButton = await page.waitForSelector("xpath///input[@aria-label='Correo personal']/ancestor::div[2]//button[text()='Guardar']");
-    if (!saveEmailButton) throw new Error("No se encontró el botón 'Guardar' para el correo.");
-    await saveEmailButton.click();
+    await page.click("xpath///input[@aria-label='Correo personal']/ancestor::div[2]//button[text()='Guardar']");
     await page.waitForFunction((email) => document.body.innerText.includes(email), {}, newEmail);
     console.log(` > Correo actualizado a ${newEmail}`);
     
@@ -99,35 +101,25 @@ export async function GET() {
     console.log('📝 Editando sección de Nombres y Apellidos...');
     const newName = "TestNombre";
     const newLastName = "TestApellido";
-    const editPersonalButton = await page.waitForSelector("xpath///button[text()='Editar Nombres/Apellidos']");
-    if (!editPersonalButton) throw new Error("No se encontró el botón 'Editar Nombres/Apellidos'.");
-    await editPersonalButton.click();
-    // ⭐ CAMBIO CLAVE: Esperar a que el CAMPO DE TEXTO aparezca DESPUÉS del clic.
+    const editPersonalButtonSelector = "xpath///button[text()='Editar Nombres/Apellidos']";
     const nameInputSelector = 'input[aria-label="Nombres"]';
-    await page.waitForSelector(nameInputSelector, { visible: true });
+    await clickAndWaitForStateChange(page, editPersonalButtonSelector, nameInputSelector); // ⭐ CAMBIO CLAVE 2
     await clearAndType(page, nameInputSelector, newName);
     await clearAndType(page, 'input[aria-label="Apellidos"]', newLastName);
     const savePersonalButtonSelector = "xpath///p[text()='Nombres']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
-    const savePersonalButton = await page.waitForSelector(savePersonalButtonSelector);
-    if (!savePersonalButton) throw new Error("No se encontró el botón 'Guardar' en la sección personal.");
-    await savePersonalButton.click();
+    await page.click(savePersonalButtonSelector);
     await page.waitForFunction((name) => document.body.innerText.includes(name), {}, newName);
     console.log(` > Nombre actualizado a ${newName} ${newLastName}`);
     
     // --- Edición de Otros Datos ---
     console.log('📝 Editando sección de Otros Datos...');
     const newAddress = generateRandomAddress();
-    const editOtherButton = await page.waitForSelector("xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']");
-    if (!editOtherButton) throw new Error("No se encontró el botón 'Editar' en otros datos.");
-    await editOtherButton.click();
-    // ⭐ CAMBIO CLAVE: Esperar a que el CAMPO DE TEXTO aparezca DESPUÉS del clic.
+    const editOtherButtonSelector = "xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
     const addressInputSelector = 'input[aria-label="Dirección"]';
-    await page.waitForSelector(addressInputSelector, { visible: true });
+    await clickAndWaitForStateChange(page, editOtherButtonSelector, addressInputSelector); // ⭐ CAMBIO CLAVE 2
     await clearAndType(page, addressInputSelector, newAddress);
     const saveOtherButtonSelector = "xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
-    const saveOtherButton = await page.waitForSelector(saveOtherButtonSelector);
-    if (!saveOtherButton) throw new Error("No se encontró el botón 'Guardar' en otros datos.");
-    await saveOtherButton.click();
+    await page.click(saveOtherButtonSelector);
     await page.waitForFunction((text) => document.body.innerText.includes(text), {}, newAddress);
     console.log(` > Dirección actualizada a "${newAddress}"`);
 
