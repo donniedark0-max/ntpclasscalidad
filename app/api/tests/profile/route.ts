@@ -187,8 +187,44 @@ export async function GET(request: Request) {
     ];
     const foundPhoneSel = await waitForAnySelector(page, possiblePhoneInputs, { visible: true, timeout: 30000 });
     await forceClickAndWait(page, foundEditSel, foundPhoneSel);
-    await clearAndType(page, phoneInputSelector, newPhone);
-    await page.click("xpath///input[@aria-label='Celular']/ancestor::div[2]//button[text()='Guardar']");
+
+    // Captura inmediatamente después de hacer click en 'Editar' para inspección
+    try {
+      await page.screenshot({ path: '/tmp/profile_after_edit_click.png' });
+      console.log('📸 Captura tras click en Editar guardada en /tmp/profile_after_edit_click.png');
+    } catch (e) {
+      console.warn('No se pudo guardar la captura post-click (continúo):', e);
+    }
+
+    // Usa el selector encontrado para escribir el nuevo teléfono (soporta xpath///...)
+    await clearAndType(page, foundPhoneSel, newPhone);
+
+    // Buscar y pulsar el botón 'Guardar' relativo al input que editamos.
+    const possibleSaveButtons = [
+      "xpath///input[contains(@aria-label, 'Celular')]/ancestor::div[2]//button[text()='Guardar']",
+      "xpath///p[text()='Celular']/ancestor::div[contains(@class,'rounded-lg')]//button[text()='Guardar']",
+      "xpath///button[text()='Guardar' and contains(., 'Celular')]",
+      "xpath///button[text()='Guardar']"
+    ];
+    let saveSel: string;
+    try {
+      saveSel = await waitForAnySelector(page, possibleSaveButtons, { visible: true, timeout: 5000 });
+    } catch (e) {
+      // fallback: intentar pulsar el primer botón 'Guardar' que encontremos
+      saveSel = "xpath///button[text()='Guardar']";
+    }
+
+    if (saveSel.startsWith('xpath')) {
+      const inner = saveSel.replace(/^xpath\/\/\/?/, '');
+      await page.waitForSelector(`xpath/${inner}`, { visible: true });
+      await page.evaluate((sel) => {
+        const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
+        el?.click();
+      }, inner);
+    } else {
+      await page.click(saveSel);
+    }
+
     await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
     console.log(` > Celular actualizado a ${newPhone}`);
 
