@@ -63,7 +63,7 @@ async function forceClickAndWait(page: Page, clickSelector: string, waitSelector
 }
 
 
-export async function GET() {
+export async function GET(request: Request) {
   console.log('🚀 Iniciando prueba de perfil (Estrategia de Clic Forzado)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
@@ -124,6 +124,32 @@ export async function GET() {
     ];
     const foundEditSel = await waitForAnySelector(page, possibleFirstEditSelectors, { visible: true, timeout: 30000 });
     console.log('✅ Datos del perfil cargados. Selector encontrado:', foundEditSel);
+
+    // If caller requested a preview, take a screenshot now and return it so
+    // the caller can inspect the loaded page before any edits.
+    try {
+      const url = new URL(request.url);
+      const preview = url.searchParams.get('preview') === 'true';
+      const previewBuffer = await page.screenshot({ type: 'png' });
+      const nodeBuffer = Buffer.from(previewBuffer as any);
+      if (preview) {
+        console.log('🔎 Preview requested — returning screenshot before edits.');
+        return new NextResponse(nodeBuffer, {
+          status: 200,
+          headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
+        });
+      } else {
+        // Always save intermediate screenshot to /tmp for debugging in Vercel logs
+        try {
+          await page.screenshot({ path: '/tmp/profile_loaded_preview.png' });
+          console.log('📸 Captura intermedia guardada en /tmp/profile_loaded_preview.png');
+        } catch (e) {
+          // ignore write errors in environments without writable fs
+        }
+      }
+    } catch (e) {
+      console.warn('No se pudo generar preview (continuando con la prueba):', e);
+    }
 
     // --- Edición de Contacto ---
     console.log('📝 Editando sección de Contacto...');
