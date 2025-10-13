@@ -222,12 +222,12 @@ export async function GET(request: Request) {
         const p = labels.find(el => el.textContent && el.textContent.trim() === 'Celular');
         if (!p) return false;
         // Buscar el botón 'Editar' dentro del mismo contenedor
-        const container = p.closest('div');
-        if (!container) return false;
-        const btn = container.querySelector('button');
-        if (!btn) return false;
-        const disabled = (btn as HTMLButtonElement).disabled;
-        const hasLoadingClass = btn.classList.contains('opacity-40') || btn.classList.contains('cursor-not-allowed');
+  const container = p.closest('div');
+  if (!container) return false;
+  const btn = container.querySelector('button');
+  if (!btn) return false;
+  const disabled = (btn as HTMLButtonElement).disabled;
+  const hasLoadingClass = btn.classList.contains('opacity-40') || btn.classList.contains('cursor-not-allowed');
         return !disabled && !hasLoadingClass;
       }, { timeout: 30000 });
       console.log('✅ El botón Editar para Contacto está habilitado y listo.');
@@ -260,7 +260,6 @@ export async function GET(request: Request) {
               const inner = foundEditSel.replace(/^xpath\/\/\/?/, '');
               await page.waitForSelector(`xpath/${inner}`, { visible: true, timeout: 3000 });
               await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.click(); }, inner);
-            } else {
               await page.waitForSelector(foundEditSel, { visible: true, timeout: 3000 });
               await page.click(foundEditSel);
             }
@@ -270,11 +269,9 @@ export async function GET(request: Request) {
             console.info('ℹ️ No se pudo clickear el botón Edit antes del preview-after:', e instanceof Error ? e.message : String(e));
           }
           const previewBuffer = await page.screenshot({ type: 'png' });
-          try { await page.screenshot({ path: '/tmp/profile_after_edit_click.png' }); } catch(_) {}
           console.log('🔎 Preview-after requested — returning screenshot after click on Edit.');
           return new NextResponse(Buffer.from(previewBuffer as any), { status: 200, headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' } });
         }
-
         // Default preview (before edits)
         if (previewParam === 'true') {
           const previewBuffer = await page.screenshot({ type: 'png' });
@@ -282,16 +279,10 @@ export async function GET(request: Request) {
           return new NextResponse(Buffer.from(previewBuffer as any), { status: 200, headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' } });
         }
       } else {
-        // Always save intermediate screenshot to /tmp for debugging in Vercel logs
-        try {
-          await page.screenshot({ path: '/tmp/profile_loaded_preview.png' });
-          console.log('📸 Captura intermedia guardada en /tmp/profile_loaded_preview.png');
-        } catch (e) {
-          // ignore write errors in environments without writable fs
-        }
+        // no intermediate screenshots; continue to edits
       }
     } catch (e) {
-      console.warn('No se pudo generar preview (continuando con la prueba):', e);
+      console.info('ℹ️ No se pudo generar preview (continuando con la prueba):', e instanceof Error ? e.message : String(e));
     }
 
     // --- Edición de Contacto ---
@@ -314,8 +305,7 @@ export async function GET(request: Request) {
     try {
       const xpath = await clickEditAndFindInputXPath(page, foundEditSel, 10000);
       console.log('✅ Input XPath encontrado en el panel editado:', xpath);
-      inputSel = `xpath///${xpath}`;
-      try { await page.screenshot({ path: '/tmp/profile_after_edit_click.png' }); console.log('📸 Captura tras click en Editar guardada en /tmp/profile_after_edit_click.png'); } catch(e){/*ignore*/}
+  inputSel = `xpath///${xpath}`;
   } catch (err) {
   console.info('ℹ️ clickEditAndFindInputXPath falló — intentaremos click robusto y esperar selectores comunes:', err instanceof Error ? err.message : String(err));
       // Ensure we clicked the Edit button (robust click)
@@ -324,7 +314,6 @@ export async function GET(request: Request) {
           const inner = foundEditSel.replace(/^xpath\/\/\/?/, '');
           await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.scrollIntoView({behavior:'auto', block:'center'}); el?.click(); }, inner);
         } else {
-          await page.waitForSelector(foundEditSel, { visible: true, timeout: 5000 });
           await page.click(foundEditSel);
         }
       } catch (e) {
@@ -342,7 +331,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // If we have an inputSel, write into it properly (supports xpath/// or css)
     if (inputSel) {
       if (inputSel.startsWith('xpath')) {
         await clearAndType(page, inputSel, newPhone);
@@ -370,7 +358,7 @@ export async function GET(request: Request) {
 
   await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
   console.log(` > Celular actualizado a ${newPhone}`);
-  try { await page.screenshot({ path: '/tmp/profile_after_phone_saved.png' }); console.log('📸 Captura tras guardar Celular en /tmp/profile_after_phone_saved.png'); } catch(_){}
+  // intermediate screenshot removed
 
     // -- Editar y Guardar Correo --
     const editEmailButtonSelector = '[data-testid="profile-correo-edit"]';
@@ -378,9 +366,9 @@ export async function GET(request: Request) {
     // Try click-first approach similar to Celular
     let emailInputSel: string | null = null;
     try {
-      const xpath = await clickEditAndFindInputXPath(page, editEmailButtonSelector, 10000);
-      emailInputSel = `xpath///${xpath}`;
-      try { await page.screenshot({ path: '/tmp/profile_after_edit_email_click.png' }); } catch(_){}
+  const xpath = await clickEditAndFindInputXPath(page, editEmailButtonSelector, 10000);
+  emailInputSel = `xpath///${xpath}`;
+  // intermediate screenshot removed
     } catch (err) {
       console.info('ℹ️ clickEditAndFindInputXPath for Correo falló — fallback to click + wait selectors:', err instanceof Error ? err.message : String(err));
       try {
