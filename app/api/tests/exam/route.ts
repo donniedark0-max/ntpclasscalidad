@@ -22,7 +22,7 @@ function getRandomOption<T>(options: T[]): T | undefined {
 }
 
 export async function GET() {
-  console.log('🚀 Iniciando prueba de examen (Éxito al enviar)...');
+  console.log('🚀 Iniciando prueba de examen (Flujo completo con logout)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
   let screenshotBuffer: any = null;
@@ -47,29 +47,18 @@ export async function GET() {
     if (!page.url().startsWith(DASHBOARD_URL)) throw new Error(`El inicio de sesión falló.`);
     console.log(`✅ Sesión iniciada como ${testUser.code}.`);
 
-    // --- Navegación (sin cambios) ---
+    // --- Navegación y resolución del examen (sin cambios) ---
     console.log(`Buscando el curso "${COURSE_NAME}"...`);
-    const courseCardXPath = `//a[.//h3[contains(., '${COURSE_NAME}')]]`;
-    const courseCard = await page.waitForSelector(`xpath/${courseCardXPath}`);
-    if (!courseCard) throw new Error(`No se encontró el curso "${COURSE_NAME}"`);
-    await courseCard.click();
+    await page.click(`xpath///a[.//h3[contains(., '${COURSE_NAME}')]]`);
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
     console.log(`Buscando la sección "${WEEK_TO_TEST}"...`);
-    const weekXPath = `//button[contains(., '${WEEK_TO_TEST}')]`;
-    const weekElement = await page.waitForSelector(`xpath/${weekXPath}`);
-    if (!weekElement) throw new Error(`No se encontró la sección "${WEEK_TO_TEST}"`);
-    await weekElement.click();
+    await page.click(`xpath///button[contains(., '${WEEK_TO_TEST}')]`);
     console.log(`Buscando el enlace del examen "${EXAM_LINK_TEXT}"...`);
-    const examLinkXPath = `//a[contains(@href, "/exam/${TEST_EXAM_ID}") and contains(., "${EXAM_LINK_TEXT}")]`;
-    const examLink = await page.waitForSelector(`xpath/${examLinkXPath}`);
-    if (!examLink) throw new Error(`No se encontró el enlace al examen "${EXAM_LINK_TEXT}"`);
-    await examLink.click();
+    await page.click(`xpath///a[contains(@href, "/exam/${TEST_EXAM_ID}") and contains(., "${EXAM_LINK_TEXT}")]`);
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
     
-    // --- Lógica de examen (sin cambios) ---
     console.log('📝 Respondiendo el examen...');
     const questions = await page.$$('div.rounded-lg.bg-white.p-6.shadow-sm div:has(h3)');
-    console.log(`🔎 Se encontraron ${questions.length} preguntas.`);
     for (const question of questions) {
         const radioOptions = await question.$$('input[type="radio"]');
         if (radioOptions.length > 0) {
@@ -95,16 +84,11 @@ export async function GET() {
     }
     
     // --- Envío y Verificación ---
-    const submitButtonXPath = "//button[contains(., 'Enviar examen')]";
-    const submitButton = await page.waitForSelector(`xpath/${submitButtonXPath}`);
-    if (!submitButton) throw new Error("No se encontró el botón 'Enviar examen'");
-    await submitButton.click();
-    
-    const confirmationTextSelector = `//h2[contains(., 'Examen en revisión')]`;
-    await page.waitForSelector(`xpath/${confirmationTextSelector}`, { timeout: 15000 });
+    await page.click(`xpath///button[contains(., 'Enviar examen')]`);
+    await page.waitForSelector(`xpath///h2[contains(., 'Examen en revisión')]`, { timeout: 15000 });
     console.log('✅ ¡Examen enviado! Pantalla de confirmación encontrada.');
     
-    // --- Captura de pantalla del éxito ---
+    // ⭐ CAMBIO 1: La captura se toma aquí, en el momento del éxito principal.
     console.log('📸 Tomando captura de pantalla de la confirmación...');
     screenshotBuffer = await page.screenshot({ type: 'png' });
     
@@ -112,8 +96,30 @@ export async function GET() {
         throw new Error("Se llegó a la confirmación, pero no se pudo tomar la captura.");
     }
 
-    // ⭐ CAMBIO CLAVE: La prueba termina aquí exitosamente
-    console.log('🎉 ¡Prueba de ciclo de examen finalizada con éxito!');
+    // ⭐ CAMBIO 2: El bot continúa desde la página de confirmación para cerrar sesión.
+    console.log('🔒 Continuando para cerrar sesión...');
+    
+    // Paso 1: Volver a la página del curso.
+    const returnToCourseLink = await page.waitForSelector(`xpath///a[contains(., 'Volver al curso')]`);
+    if (!returnToCourseLink) throw new Error("No se encontró el enlace para 'Volver al curso'");
+    await returnToCourseLink.click();
+    
+    // Paso 2: Esperar a que la página del curso cargue completamente.
+    // Buscamos un elemento que sabemos que debe estar allí, como el título de las semanas.
+    await page.waitForSelector(`xpath///h2[contains(., 'Total de semanas')]`, { timeout: 15000 });
+    console.log('... Regresó a la página del curso.');
+
+    // Paso 3: Abrir el menú de perfil y cerrar sesión (con la pausa de seguridad).
+    await page.click('button[aria-haspopup="menu"]');
+    await new Promise(r => setTimeout(r, 500)); // Pausa para la animación
+    const logoutButton = await page.waitForSelector(`xpath///button[contains(., 'Cerrar sesión')]`, { visible: true });
+    if (!logoutButton) throw new Error('El botón de logout no apareció en el menú.');
+    await logoutButton.click();
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+    console.log('✅ Cierre de sesión exitoso.');
+
+    // La prueba finaliza y devuelve la captura tomada ANTES del cierre de sesión.
+    console.log('🎉 ¡Prueba de ciclo completo finalizada con éxito!');
     const imageBlob = new Blob([screenshotBuffer], { type: 'png' });
     return new NextResponse(imageBlob, {
         status: 200,
@@ -131,8 +137,6 @@ export async function GET() {
     const errorMessage = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   } finally {
-    // El navegador se cerrará siempre, sin importar si la prueba falló o tuvo éxito.
-    // Esto es importante para no dejar procesos abiertos en Vercel.
     if (browser) {
       await browser.close();
     }
