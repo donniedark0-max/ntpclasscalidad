@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getBrowser } from '../../../../lib/puppeteer-browser';
 import { Browser, Page } from 'puppeteer';
 
-// --- Constantes y Helpers ---
+// --- Constantes y Helpers (sin cambios) ---
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const LOGIN_URL = `${APP_URL}/`;
 const DASHBOARD_URL = `${APP_URL}/dashboard`;
@@ -28,24 +28,8 @@ async function clearAndType(page: Page, selector: string, text: string) {
   await page.type(selector, text);
 }
 
-// ⭐ CAMBIO CLAVE 1: Helper para un clic más robusto
-async function robustClick(page: Page, selector: string) {
-  await page.waitForSelector(selector, { visible: true });
-  await page.evaluate((sel) => {
-    let element: HTMLElement | null = null;
-    if (sel.startsWith('xpath///')) {
-      const cleanSel = sel.replace('xpath///', '');
-      element = document.evaluate(cleanSel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
-    } else {
-      element = document.querySelector(sel) as HTMLElement;
-    }
-    element?.click();
-  }, selector);
-}
-
-
 export async function GET() {
-  console.log('🚀 Iniciando prueba de perfil (Con Clic Robusto para Vercel)...');
+  console.log('🚀 Iniciando prueba de perfil (Con Pausas Estratégicas para Vercel)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
   let screenshotBuffer: any = null;
@@ -55,7 +39,7 @@ export async function GET() {
     page = await browser.newPage();
     await page.setViewport({ width: 1366, height: 900 });
 
-    // --- Login ---
+    // --- Login Integrado ---
     console.log('🔑 Autenticando usuario...');
     const usersJson = process.env.TEST_USERS_JSON;
     if (!usersJson) throw new Error('TEST_USERS_JSON no está definido.');
@@ -72,33 +56,41 @@ export async function GET() {
 
     // --- Navegación y Carga de Página ---
     await page.goto(`${APP_URL}/dashboard/profile`, { waitUntil: 'networkidle2' });
-    console.log('✅ Navegado a la página de perfil.');
-    console.log('⏳ Esperando a que los datos carguen...');
+    console.log('✅ Navegado a la página de edición de perfil.');
+    console.log('⏳ Esperando a que los datos del perfil carguen...');
     const firstEditButtonSelector = "xpath///p[text()='Celular']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
-    await page.waitForSelector(firstEditButtonSelector, { visible: true, timeout: 20000 });
+    await page.waitForSelector(firstEditButtonSelector, { visible: true, timeout: 15000 });
     console.log('✅ Datos del perfil cargados.');
 
     // --- Edición de Contacto ---
     console.log('📝 Editando sección de Contacto...');
     const newPhone = generateRandomPhoneNumber();
     const newEmail = generateRandomEmail();
-
-    // -- Editar y Guardar Celular --
-    await robustClick(page, firstEditButtonSelector); // ⭐ CAMBIO CLAVE 2
-    const phoneInputSelector = 'input[aria-label="Celular"]';
-    await page.waitForSelector(phoneInputSelector, { visible: true });
-    await clearAndType(page, phoneInputSelector, newPhone);
-    await robustClick(page, "xpath///input[@aria-label='Celular']/ancestor::div[2]//button[text()='Guardar']");
+    const editPhoneButton = await page.waitForSelector(firstEditButtonSelector);
+    if (!editPhoneButton) throw new Error("No se encontró el botón 'Editar' para Celular.");
+    
+    await editPhoneButton.click();
+    // ⭐ CAMBIO CLAVE: Pausa para darle tiempo a React de re-renderizar en Vercel.
+    await new Promise(r => setTimeout(r, 500)); 
+    
+    await clearAndType(page, 'input[aria-label="Celular"]', newPhone);
+    const savePhoneButton = await page.waitForSelector("xpath///input[@aria-label='Celular']/ancestor::div[2]//button[text()='Guardar']");
+    if (!savePhoneButton) throw new Error("No se encontró el botón 'Guardar' para el celular.");
+    await savePhoneButton.click();
     await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
     console.log(` > Celular actualizado a ${newPhone}`);
 
-    // -- Editar y Guardar Correo --
-    const editEmailButtonSelector = "xpath///p[contains(text(), 'Correo')]/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
-    await robustClick(page, editEmailButtonSelector); // ⭐ CAMBIO CLAVE 2
-    const emailInputSelector = 'input[aria-label="Correo personal"]';
-    await page.waitForSelector(emailInputSelector, { visible: true });
-    await clearAndType(page, emailInputSelector, newEmail);
-    await robustClick(page, "xpath///input[@aria-label='Correo personal']/ancestor::div[2]//button[text()='Guardar']");
+    const editEmailButton = await page.waitForSelector("xpath///p[contains(text(), 'Correo')]/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']");
+    if (!editEmailButton) throw new Error("No se encontró el botón 'Editar' para Correo.");
+
+    await editEmailButton.click();
+    // ⭐ CAMBIO CLAVE: Pausa para darle tiempo a React de re-renderizar en Vercel.
+    await new Promise(r => setTimeout(r, 500)); 
+
+    await clearAndType(page, 'input[aria-label="Correo personal"]', newEmail);
+    const saveEmailButton = await page.waitForSelector("xpath///input[@aria-label='Correo personal']/ancestor::div[2]//button[text()='Guardar']");
+    if (!saveEmailButton) throw new Error("No se encontró el botón 'Guardar' para el correo.");
+    await saveEmailButton.click();
     await page.waitForFunction((email) => document.body.innerText.includes(email), {}, newEmail);
     console.log(` > Correo actualizado a ${newEmail}`);
     
@@ -106,27 +98,37 @@ export async function GET() {
     console.log('📝 Editando sección de Nombres y Apellidos...');
     const newName = "TestNombre";
     const newLastName = "TestApellido";
-    const editPersonalButtonSelector = "xpath///button[text()='Editar Nombres/Apellidos']";
-    await robustClick(page, editPersonalButtonSelector); // ⭐ CAMBIO CLAVE 2
-    const nameInputSelector = 'input[aria-label="Nombres"]';
-    await page.waitForSelector(nameInputSelector, { visible: true });
-    await clearAndType(page, nameInputSelector, newName);
+    const editPersonalButton = await page.waitForSelector("xpath///button[text()='Editar Nombres/Apellidos']");
+    if (!editPersonalButton) throw new Error("No se encontró el botón 'Editar Nombres/Apellidos'.");
+    
+    await editPersonalButton.click();
+    // ⭐ CAMBIO CLAVE: Pausa para darle tiempo a React de re-renderizar en Vercel.
+    await new Promise(r => setTimeout(r, 500)); 
+
+    await clearAndType(page, 'input[aria-label="Nombres"]', newName);
     await clearAndType(page, 'input[aria-label="Apellidos"]', newLastName);
     const savePersonalButtonSelector = "xpath///p[text()='Nombres']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
-    await robustClick(page, savePersonalButtonSelector);
+    const savePersonalButton = await page.waitForSelector(savePersonalButtonSelector);
+    if (!savePersonalButton) throw new Error("No se encontró el botón 'Guardar' en la sección personal.");
+    await savePersonalButton.click();
     await page.waitForFunction((name) => document.body.innerText.includes(name), {}, newName);
     console.log(` > Nombre actualizado a ${newName} ${newLastName}`);
     
     // --- Edición de Otros Datos ---
     console.log('📝 Editando sección de Otros Datos...');
     const newAddress = generateRandomAddress();
-    const editOtherButtonSelector = "xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
-    await robustClick(page, editOtherButtonSelector); // ⭐ CAMBIO CLAVE 2
-    const addressInputSelector = 'input[aria-label="Dirección"]';
-    await page.waitForSelector(addressInputSelector, { visible: true });
-    await clearAndType(page, addressInputSelector, newAddress);
+    const editOtherButton = await page.waitForSelector("xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']");
+    if (!editOtherButton) throw new Error("No se encontró el botón 'Editar' en otros datos.");
+    
+    await editOtherButton.click();
+    // ⭐ CAMBIO CLAVE: Pausa para darle tiempo a React de re-renderizar en Vercel.
+    await new Promise(r => setTimeout(r, 500)); 
+
+    await clearAndType(page, 'input[aria-label="Dirección"]', newAddress);
     const saveOtherButtonSelector = "xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
-    await robustClick(page, saveOtherButtonSelector);
+    const saveOtherButton = await page.waitForSelector(saveOtherButtonSelector);
+    if (!saveOtherButton) throw new Error("No se encontró el botón 'Guardar' en otros datos.");
+    await saveOtherButton.click();
     await page.waitForFunction((text) => document.body.innerText.includes(text), {}, newAddress);
     console.log(` > Dirección actualizada a "${newAddress}"`);
 
