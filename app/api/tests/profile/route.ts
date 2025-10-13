@@ -20,7 +20,7 @@ function generateRandomAddress(): string {
   return `${streets[Math.floor(Math.random() * streets.length)]} ${number}`;
 }
 async function clearAndType(page: Page, selector: string, text: string) {
-  // La espera ya está garantizada antes de llamar a esta función
+  // La espera ya está garantizada antes de llamar a esta función.
   await page.evaluate((sel) => {
       const input = document.querySelector(sel) as HTMLInputElement;
       if (input) input.value = '';
@@ -29,7 +29,7 @@ async function clearAndType(page: Page, selector: string, text: string) {
 }
 
 export async function GET() {
-  console.log('🚀 Iniciando prueba de perfil (Con Esperas de Resultado)...');
+  console.log('🚀 Iniciando prueba de perfil (Con Esperas de Resultado para Vercel)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
   let screenshotBuffer: any = null;
