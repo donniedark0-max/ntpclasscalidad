@@ -20,7 +20,7 @@ function generateRandomAddress(): string {
   return `${streets[Math.floor(Math.random() * streets.length)]} ${number}`;
 }
 async function clearAndType(page: Page, selector: string, text: string) {
-  await page.waitForSelector(selector, { visible: true });
+  // Ya no es necesario esperar aquí, porque lo haremos explícitamente después de cada click.
   await page.evaluate((sel) => {
       const input = document.querySelector(sel) as HTMLInputElement;
       if (input) input.value = '';
@@ -29,7 +29,7 @@ async function clearAndType(page: Page, selector: string, text: string) {
 }
 
 export async function GET() {
-  console.log('🚀 Iniciando prueba de edición de perfil (Selector de Dirección Corregido)...');
+  console.log('🚀 Iniciando prueba de perfil (Optimizada para Vercel)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
   let screenshotBuffer: any = null;
@@ -39,7 +39,7 @@ export async function GET() {
     page = await browser.newPage();
     await page.setViewport({ width: 1366, height: 900 });
 
-    // --- Login Integrado ---
+    // --- Login ---
     console.log('🔑 Autenticando usuario...');
     const usersJson = process.env.TEST_USERS_JSON;
     if (!usersJson) throw new Error('TEST_USERS_JSON no está definido.');
@@ -56,29 +56,39 @@ export async function GET() {
 
     // --- Navegación y Carga de Página ---
     await page.goto(`${APP_URL}/dashboard/profile`, { waitUntil: 'networkidle2' });
-    console.log('✅ Navegado a la página de edición de perfil.');
-    console.log('⏳ Esperando a que los datos del perfil carguen...');
+    console.log('✅ Navegado a la página de perfil.');
+    console.log('⏳ Esperando a que los datos carguen...');
     const firstEditButtonSelector = "xpath///p[text()='Celular']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
-    await page.waitForSelector(firstEditButtonSelector, { visible: true, timeout: 15000 });
+    await page.waitForSelector(firstEditButtonSelector, { visible: true, timeout: 20000 });
     console.log('✅ Datos del perfil cargados.');
 
     // --- Edición de Contacto ---
     console.log('📝 Editando sección de Contacto...');
     const newPhone = generateRandomPhoneNumber();
     const newEmail = generateRandomEmail();
+
+    // -- Editar y Guardar Celular --
     const editPhoneButton = await page.waitForSelector(firstEditButtonSelector);
     if (!editPhoneButton) throw new Error("No se encontró el botón 'Editar' para Celular.");
     await editPhoneButton.click();
-    await clearAndType(page, 'input[aria-label="Celular"]', newPhone);
+    // ⭐ CAMBIO CLAVE: Esperar explícitamente a que aparezca el campo de texto.
+    const phoneInputSelector = 'input[aria-label="Celular"]';
+    await page.waitForSelector(phoneInputSelector, { visible: true });
+    await clearAndType(page, phoneInputSelector, newPhone);
     const savePhoneButton = await page.waitForSelector("xpath///input[@aria-label='Celular']/ancestor::div[2]//button[text()='Guardar']");
     if (!savePhoneButton) throw new Error("No se encontró el botón 'Guardar' para el celular.");
     await savePhoneButton.click();
     await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
     console.log(` > Celular actualizado a ${newPhone}`);
+
+    // -- Editar y Guardar Correo --
     const editEmailButton = await page.waitForSelector("xpath///p[contains(text(), 'Correo')]/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']");
     if (!editEmailButton) throw new Error("No se encontró el botón 'Editar' para Correo.");
     await editEmailButton.click();
-    await clearAndType(page, 'input[aria-label="Correo personal"]', newEmail);
+    // ⭐ CAMBIO CLAVE: Esperar explícitamente a que aparezca el campo de texto.
+    const emailInputSelector = 'input[aria-label="Correo personal"]';
+    await page.waitForSelector(emailInputSelector, { visible: true });
+    await clearAndType(page, emailInputSelector, newEmail);
     const saveEmailButton = await page.waitForSelector("xpath///input[@aria-label='Correo personal']/ancestor::div[2]//button[text()='Guardar']");
     if (!saveEmailButton) throw new Error("No se encontró el botón 'Guardar' para el correo.");
     await saveEmailButton.click();
@@ -92,7 +102,10 @@ export async function GET() {
     const editPersonalButton = await page.waitForSelector("xpath///button[text()='Editar Nombres/Apellidos']");
     if (!editPersonalButton) throw new Error("No se encontró el botón 'Editar Nombres/Apellidos'.");
     await editPersonalButton.click();
-    await clearAndType(page, 'input[aria-label="Nombres"]', newName);
+    // ⭐ CAMBIO CLAVE: Esperar explícitamente a que aparezca el campo de texto.
+    const nameInputSelector = 'input[aria-label="Nombres"]';
+    await page.waitForSelector(nameInputSelector, { visible: true });
+    await clearAndType(page, nameInputSelector, newName);
     await clearAndType(page, 'input[aria-label="Apellidos"]', newLastName);
     const savePersonalButtonSelector = "xpath///p[text()='Nombres']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
     const savePersonalButton = await page.waitForSelector(savePersonalButtonSelector);
@@ -107,10 +120,10 @@ export async function GET() {
     const editOtherButton = await page.waitForSelector("xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']");
     if (!editOtherButton) throw new Error("No se encontró el botón 'Editar' en otros datos.");
     await editOtherButton.click();
-    
-    // ⭐ CAMBIO CLAVE: Se corrige el aria-label para que coincida con el del formulario.
-    await clearAndType(page, 'input[aria-label="Dirección"]', newAddress);
-    
+    // ⭐ CAMBIO CLAVE: Esperar explícitamente a que aparezca el campo de texto.
+    const addressInputSelector = 'input[aria-label="Dirección"]';
+    await page.waitForSelector(addressInputSelector, { visible: true });
+    await clearAndType(page, addressInputSelector, newAddress);
     const saveOtherButtonSelector = "xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
     const saveOtherButton = await page.waitForSelector(saveOtherButtonSelector);
     if (!saveOtherButton) throw new Error("No se encontró el botón 'Guardar' en otros datos.");
