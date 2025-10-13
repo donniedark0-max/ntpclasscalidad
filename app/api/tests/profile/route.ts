@@ -83,6 +83,74 @@ async function forceClickAndWait(page: Page, clickSelector: string, waitSelector
   }
 }
 
+// Click an Edit button (css or xpath///...) and wait for an input to appear inside the same panel.
+// Returns a full XPath string for the found input (without the 'xpath///' prefix).
+async function clickEditAndFindInputXPath(page: Page, clickSelector: string, timeout = 10000) {
+  console.log(` > clickEditAndFindInputXPath: clicking ${clickSelector} and waiting up to ${timeout}ms for input in the same panel`);
+
+  // First, click the button (supports xpath or css)
+  if (clickSelector.startsWith('xpath')) {
+    const xpathInner = clickSelector.replace(/^xpath\/\/\/?/, '');
+    await page.waitForSelector(`xpath/${xpathInner}`, { visible: true, timeout: 5000 });
+    await page.evaluate((sel) => {
+      const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
+      el?.click();
+    }, xpathInner);
+  } else {
+    await page.waitForSelector(clickSelector, { visible: true, timeout: 5000 });
+    await page.click(clickSelector);
+  }
+
+  // Now wait for an input/textarea to appear inside the clicked button's container.
+  // We use page.waitForFunction which can return the XPath when found.
+  const handle = await page.waitForFunction((sel) => {
+    function findButton(selStr: string) {
+      try {
+        if (selStr.startsWith('xpath')) {
+          const x = selStr.replace(/^xpath\/\/\/?/, '');
+          return document.evaluate(x, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement | null;
+        }
+        return document.querySelector(selStr) as HTMLElement | null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function getXPathForElement(el: Element) {
+      if (!el) return null;
+      if (el.id) return `//*[@id="${el.id}"]`;
+      const parts: string[] = [];
+      let node: Element | null = el;
+      while (node && node.nodeType === Node.ELEMENT_NODE) {
+        let index = 1;
+        let sibling = node.previousElementSibling;
+        while (sibling) { if (sibling.nodeName === node.nodeName) index++; sibling = sibling.previousElementSibling; }
+        parts.unshift(node.nodeName.toLowerCase() + (index > 1 ? `[${index}]` : ''));
+        node = node.parentElement;
+      }
+      return '/' + parts.join('/');
+    }
+
+    const btn = findButton(sel as string);
+    if (!btn) return null;
+    // climb up a few levels looking for a container that will host the input
+    let node: Element | null = btn.closest('div');
+    for (let i = 0; i < 8 && node; i++) {
+      const input = node.querySelector('input, textarea, select');
+      if (input) {
+        const xpath = getXPathForElement(input);
+        return xpath; // non-null string signals success
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }, { timeout, polling: 500 }, clickSelector as any);
+
+  const xpath = await (handle as any).jsonValue();
+  if (!xpath) throw new Error('No input appeared in the edit panel after clicking');
+  return xpath as string;
+}
+
 
 export async function GET(request: Request) {
   console.log('🚀 Iniciando prueba de perfil (Estrategia de Clic Forzado)...');
@@ -186,43 +254,35 @@ export async function GET(request: Request) {
       "xpath///input[contains(@placeholder, 'Celular')]",
     ];
     const foundPhoneSel = await waitForAnySelector(page, possiblePhoneInputs, { visible: true, timeout: 30000 });
-    await forceClickAndWait(page, foundEditSel, foundPhoneSel);
-
-    // Captura inmediatamente después de hacer click en 'Editar' para inspección
+    // Click edit and find the input inside the same panel (returns XPath)
+    let inputXPath: string | null = null;
     try {
-      await page.screenshot({ path: '/tmp/profile_after_edit_click.png' });
-      console.log('📸 Captura tras click en Editar guardada en /tmp/profile_after_edit_click.png');
-    } catch (e) {
-      console.warn('No se pudo guardar la captura post-click (continúo):', e);
+      inputXPath = await clickEditAndFindInputXPath(page, foundEditSel, 10000);
+      console.log('✅ Input XPath encontrado en el panel editado:', inputXPath);
+      // save a screenshot immediately after click
+      try { await page.screenshot({ path: '/tmp/profile_after_edit_click.png' }); console.log('📸 Captura tras click en Editar guardada en /tmp/profile_after_edit_click.png'); } catch(e){/*ignore*/}
+    } catch (err) {
+      console.warn('⚠️ No se pudo localizar input relativo al botón Edit (fallback a selectors globales):', err);
+      // fallback: use previously found selector
+      inputXPath = foundPhoneSel.startsWith('xpath') ? foundPhoneSel.replace(/^xpath\/\/\/?/, '') : null;
     }
 
-    // Usa el selector encontrado para escribir el nuevo teléfono (soporta xpath///...)
-    await clearAndType(page, foundPhoneSel, newPhone);
-
-    // Buscar y pulsar el botón 'Guardar' relativo al input que editamos.
-    const possibleSaveButtons = [
-      "xpath///input[contains(@aria-label, 'Celular')]/ancestor::div[2]//button[text()='Guardar']",
-      "xpath///p[text()='Celular']/ancestor::div[contains(@class,'rounded-lg')]//button[text()='Guardar']",
-      "xpath///button[text()='Guardar' and contains(., 'Celular')]",
-      "xpath///button[text()='Guardar']"
-    ];
-    let saveSel: string;
-    try {
-      saveSel = await waitForAnySelector(page, possibleSaveButtons, { visible: true, timeout: 5000 });
-    } catch (e) {
-      // fallback: intentar pulsar el primer botón 'Guardar' que encontremos
-      saveSel = "xpath///button[text()='Guardar']";
-    }
-
-    if (saveSel.startsWith('xpath')) {
-      const inner = saveSel.replace(/^xpath\/\/\/?/, '');
-      await page.waitForSelector(`xpath/${inner}`, { visible: true });
-      await page.evaluate((sel) => {
-        const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
-        el?.click();
-      }, inner);
+    if (inputXPath) {
+      // Write using the XPath we obtained
+      await clearAndType(page, `xpath///${inputXPath}`, newPhone);
+      // Click the Save button relative to that input: ancestor::div[2] pattern
+      const saveRelXPath = `xpath///${inputXPath}/ancestor::div[2]//button[text()='Guardar']`;
+      try {
+        await page.waitForSelector(`xpath/${inputXPath}`, { visible: true, timeout: 2000 });
+        await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.click(); }, saveRelXPath.replace(/^xpath\/\/\/?/, ''));
+      } catch (e) {
+        // fallback: try a generic Save button
+        try { await page.click("xpath///button[text()='Guardar']"); } catch (_) { /* ignore */ }
+      }
     } else {
-      await page.click(saveSel);
+      // Final fallback: use global CSS selector path
+      await clearAndType(page, phoneInputSelector, newPhone);
+      await page.click("xpath///button[text()='Guardar']");
     }
 
     await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
