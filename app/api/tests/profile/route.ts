@@ -28,21 +28,24 @@ async function clearAndType(page: Page, selector: string, text: string) {
   await page.type(selector, text);
 }
 
-// ⭐ CAMBIO CLAVE 1: Nueva función ultra-robusta para hacer clic y esperar el cambio de estado.
-async function clickAndWaitForStateChange(page: Page, clickSelector: string, resultSelector: string) {
-  console.log(` > Clickeando '${clickSelector}' y esperando por '${resultSelector}'...`);
+// ⭐ CAMBIO CLAVE 1: Nueva función de clic ultra-robusta que fuerza el evento en el navegador.
+async function forceClickAndWait(page: Page, clickSelector: string, waitSelector: string) {
+  console.log(` > Forzando clic en '${clickSelector}' y esperando por '${waitSelector}'...`);
   await page.waitForSelector(clickSelector, { visible: true });
+  
+  await page.evaluate((sel) => {
+    // Esta función se ejecuta DENTRO del navegador.
+    const element = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
+    element?.click();
+  }, clickSelector.replace('xpath///', '')); // Le quitamos el prefijo para usarlo en el navegador
 
-  // Ejecutamos el clic y la espera del resultado en paralelo.
-  // Esto resuelve las carreras de condiciones en SPAs (React, Vue, etc).
-  await Promise.all([
-    page.click(clickSelector),
-    page.waitForSelector(resultSelector, { visible: true, timeout: 15000 }),
-  ]);
+  // Después de forzar el clic, esperamos a que aparezca el resultado.
+  await page.waitForSelector(waitSelector, { visible: true, timeout: 20000 });
 }
 
+
 export async function GET() {
-  console.log('🚀 Iniciando prueba de perfil (Estrategia de Verificación de Estado)...');
+  console.log('🚀 Iniciando prueba de perfil (Estrategia de Clic Forzado)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
   let screenshotBuffer: any = null;
@@ -82,7 +85,7 @@ export async function GET() {
     
     // -- Editar y Guardar Celular --
     const phoneInputSelector = 'input[aria-label="Celular"]';
-    await clickAndWaitForStateChange(page, firstEditButtonSelector, phoneInputSelector); // ⭐ CAMBIO CLAVE 2
+    await forceClickAndWait(page, firstEditButtonSelector, phoneInputSelector); // ⭐ CAMBIO CLAVE 2
     await clearAndType(page, phoneInputSelector, newPhone);
     await page.click("xpath///input[@aria-label='Celular']/ancestor::div[2]//button[text()='Guardar']");
     await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
@@ -91,7 +94,7 @@ export async function GET() {
     // -- Editar y Guardar Correo --
     const editEmailButtonSelector = "xpath///p[contains(text(), 'Correo')]/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
     const emailInputSelector = 'input[aria-label="Correo personal"]';
-    await clickAndWaitForStateChange(page, editEmailButtonSelector, emailInputSelector); // ⭐ CAMBIO CLAVE 2
+    await forceClickAndWait(page, editEmailButtonSelector, emailInputSelector); // ⭐ CAMBIO CLAVE 2
     await clearAndType(page, emailInputSelector, newEmail);
     await page.click("xpath///input[@aria-label='Correo personal']/ancestor::div[2]//button[text()='Guardar']");
     await page.waitForFunction((email) => document.body.innerText.includes(email), {}, newEmail);
@@ -103,7 +106,7 @@ export async function GET() {
     const newLastName = "TestApellido";
     const editPersonalButtonSelector = "xpath///button[text()='Editar Nombres/Apellidos']";
     const nameInputSelector = 'input[aria-label="Nombres"]';
-    await clickAndWaitForStateChange(page, editPersonalButtonSelector, nameInputSelector); // ⭐ CAMBIO CLAVE 2
+    await forceClickAndWait(page, editPersonalButtonSelector, nameInputSelector); // ⭐ CAMBIO CLAVE 2
     await clearAndType(page, nameInputSelector, newName);
     await clearAndType(page, 'input[aria-label="Apellidos"]', newLastName);
     const savePersonalButtonSelector = "xpath///p[text()='Nombres']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
@@ -116,7 +119,7 @@ export async function GET() {
     const newAddress = generateRandomAddress();
     const editOtherButtonSelector = "xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
     const addressInputSelector = 'input[aria-label="Dirección"]';
-    await clickAndWaitForStateChange(page, editOtherButtonSelector, addressInputSelector); // ⭐ CAMBIO CLAVE 2
+    await forceClickAndWait(page, editOtherButtonSelector, addressInputSelector); // ⭐ CAMBIO CLAVE 2
     await clearAndType(page, addressInputSelector, newAddress);
     const saveOtherButtonSelector = "xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
     await page.click(saveOtherButtonSelector);
