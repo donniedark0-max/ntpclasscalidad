@@ -93,11 +93,34 @@ export async function GET() {
     await page.goto(`${APP_URL}/dashboard/profile`, { waitUntil: 'networkidle2' });
     console.log('✅ Navegado a la página de perfil.');
     console.log('⏳ Esperando a que los datos del perfil carguen...');
+    // Primero esperamos a que el skeleton/estado de carga desaparezca y que el botón 'Editar' esté habilitado.
+    // Esto evita intentar clickear mientras la UI muestra placeholders (animate-pulse) y el botón está deshabilitado.
+    try {
+      await page.waitForFunction(() => {
+        // Buscar el bloque de 'Celular' y el botón dentro.
+        const labels = Array.from(document.querySelectorAll('p.font-semibold'));
+        const p = labels.find(el => el.textContent && el.textContent.trim() === 'Celular');
+        if (!p) return false;
+        // Buscar el botón 'Editar' dentro del mismo contenedor
+        const container = p.closest('div');
+        if (!container) return false;
+        const btn = container.querySelector('button');
+        if (!btn) return false;
+        const disabled = (btn as HTMLButtonElement).disabled;
+        const hasLoadingClass = btn.classList.contains('opacity-40') || btn.classList.contains('cursor-not-allowed');
+        return !disabled && !hasLoadingClass;
+      }, { timeout: 30000 });
+      console.log('✅ El botón Editar para Contacto está habilitado y listo.');
+    } catch (e) {
+      console.log('⚠️ No detectamos el botón Editar habilitado dentro del timeout de 30s, procederemos a probar selectores alternativos de todos modos.');
+    }
+
     // Try several selectors to be resilient to slight DOM differences or localization
     const possibleFirstEditSelectors = [
       "xpath///p[text()='Celular']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']",
       "xpath///p[contains(., 'Celular')]/ancestor::div//button[contains(., 'Editar')]",
       "xpath///button[contains(., 'Editar') and contains(., 'Celular')]",
+      "xpath///button[contains(., 'Editar')][1]"
     ];
     const foundEditSel = await waitForAnySelector(page, possibleFirstEditSelectors, { visible: true, timeout: 30000 });
     console.log('✅ Datos del perfil cargados. Selector encontrado:', foundEditSel);
