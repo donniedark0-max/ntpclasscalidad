@@ -5,7 +5,7 @@ import { getBrowser } from '../../../../lib/puppeteer-browser';
 import { Browser, Page } from 'puppeteer';
 import path from 'path';
 
-// --- Constantes de la prueba ---
+// --- Constantes (sin cambios) ---
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const LOGIN_URL = `${APP_URL}/`;
 const DASHBOARD_URL = `${APP_URL}/dashboard`;
@@ -15,7 +15,6 @@ const TEST_EXAM_ID = 'exam-week-1';
 const EXAM_LINK_TEXT = 'Examen Semana 1';
 const PREDETERMINED_TEXT_ANSWER = "Respuesta de prueba automatizada para la pregunta abierta.";
 
-// Función auxiliar (sin cambios)
 function getRandomOption<T>(options: T[]): T | undefined {
   if (options.length === 0) return undefined;
   const randomIndex = Math.floor(Math.random() * options.length);
@@ -23,7 +22,7 @@ function getRandomOption<T>(options: T[]): T | undefined {
 }
 
 export async function GET() {
-  console.log('🚀 Iniciando prueba de examen (Manejo de Checkboxes añadido)...');
+  console.log('🚀 Iniciando prueba de examen (Más robusta para producción)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
   let screenshotBuffer: any = null;
@@ -33,7 +32,7 @@ export async function GET() {
     page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
 
-    // --- Lógica de Login ---
+    // --- Login (sin cambios) ---
     console.log('🔑 Autenticando usuario...');
     const usersJson = process.env.TEST_USERS_JSON;
     if (!usersJson) throw new Error('TEST_USERS_JSON no está definido.');
@@ -48,20 +47,18 @@ export async function GET() {
     if (!page.url().startsWith(DASHBOARD_URL)) throw new Error(`El inicio de sesión falló.`);
     console.log(`✅ Sesión iniciada como ${testUser.code}.`);
 
-    // --- Navegación hasta el examen ---
+    // --- Navegación (sin cambios) ---
     console.log(`Buscando el curso "${COURSE_NAME}"...`);
     const courseCardXPath = `//a[.//h3[contains(., '${COURSE_NAME}')]]`;
     const courseCard = await page.waitForSelector(`xpath/${courseCardXPath}`);
     if (!courseCard) throw new Error(`No se encontró el curso "${COURSE_NAME}"`);
     await courseCard.click();
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
-    
     console.log(`Buscando la sección "${WEEK_TO_TEST}"...`);
     const weekXPath = `//button[contains(., '${WEEK_TO_TEST}')]`;
     const weekElement = await page.waitForSelector(`xpath/${weekXPath}`);
     if (!weekElement) throw new Error(`No se encontró la sección "${WEEK_TO_TEST}"`);
     await weekElement.click();
-    
     console.log(`Buscando el enlace del examen "${EXAM_LINK_TEXT}"...`);
     const examLinkXPath = `//a[contains(@href, "/exam/${TEST_EXAM_ID}") and contains(., "${EXAM_LINK_TEXT}")]`;
     const examLink = await page.waitForSelector(`xpath/${examLinkXPath}`);
@@ -69,39 +66,30 @@ export async function GET() {
     await examLink.click();
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
     
-    // --- Lógica para resolver el examen ---
+    // --- Lógica de examen (sin cambios) ---
     console.log('📝 Respondiendo el examen...');
     const questions = await page.$$('div.rounded-lg.bg-white.p-6.shadow-sm div:has(h3)');
     console.log(`🔎 Se encontraron ${questions.length} preguntas.`);
-
     for (const question of questions) {
-        // 1. Responder opción única (Radio buttons)
         const radioOptions = await question.$$('input[type="radio"]');
         if (radioOptions.length > 0) {
             const randomOption = getRandomOption(radioOptions);
             if (randomOption) await randomOption.click();
-            continue; // Pasa a la siguiente pregunta
+            continue;
         }
-
-        // ⭐ CAMBIO: Lógica añadida para responder selección múltiple (Checkboxes)
         const checkboxOptions = await question.$$('input[type="checkbox"]');
         if (checkboxOptions.length > 0) {
-            // Para cumplir la validación, seleccionamos al menos una opción al azar.
             const randomCheckbox = getRandomOption(checkboxOptions);
             if (randomCheckbox) await randomCheckbox.click();
-            continue; // Pasa a la siguiente pregunta
+            continue;
         }
-
-        // 3. Responder pregunta de texto y adjuntar archivo
         const textArea = await question.$('textarea');
         if (textArea) {
             await textArea.type(PREDETERMINED_TEXT_ANSWER);
             const fileInput = await question.$('input[type="file"]');
             if (fileInput) {
-                console.log('... Adjuntando archivo opcional...');
                 const filePath = path.resolve(process.cwd(), 'public/error-exam-test.png');
                 await fileInput.uploadFile(filePath);
-                console.log('   ✅ Archivo adjuntado.');
             }
         }
     }
@@ -111,26 +99,38 @@ export async function GET() {
     const submitButton = await page.waitForSelector(`xpath/${submitButtonXPath}`);
     if (!submitButton) throw new Error("No se encontró el botón 'Enviar examen'");
     await submitButton.click();
-    
     const confirmationTextSelector = `//h2[contains(., 'Examen en revisión')]`;
     await page.waitForSelector(`xpath/${confirmationTextSelector}`, { timeout: 15000 });
     console.log('✅ ¡Examen enviado! Pantalla de confirmación encontrada.');
     
-    // --- Captura de pantalla y Cierre de sesión ---
+    // --- Captura de pantalla del éxito ---
     console.log('📸 Tomando captura de pantalla de la confirmación...');
     screenshotBuffer = await page.screenshot({ type: 'png' });
     
+    // --- PASO FINAL: Cerrar Sesión (Con corrección) ---
+    console.log('🔒 Procediendo a cerrar la sesión...');
     await page.goto(DASHBOARD_URL, { waitUntil: 'networkidle2' });
-    await page.click('button[aria-haspopup="menu"]');
-    const logoutButton = await page.waitForSelector(`xpath///button[contains(., 'Cerrar sesión')]`, { visible: true });
-    if (!logoutButton) throw new Error('El botón de logout no apareció.');
+    
+    const menuTriggerSelector = 'button[aria-haspopup="menu"]';
+    await page.click(menuTriggerSelector);
+
+    // ⭐ CAMBIO CLAVE: Pausa para la animación del menú
+    // Le damos al navegador 500ms para que el menú desplegable aparezca
+    // antes de que el script intente interactuar con él.
+    await new Promise(r => setTimeout(r, 500));
+    
+    const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
+    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
+    
+    if (!logoutButton) throw new Error('El botón de logout no apareció en el menú.');
+
     await logoutButton.click();
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
     console.log('✅ Cierre de sesión exitoso.');
     
     if (!screenshotBuffer) throw new Error("No se pudo tomar la captura.");
 
-    // Devolver la imagen
+    // --- Devolver la imagen ---
     console.log('🎉 ¡Prueba de ciclo completo de examen finalizada!');
     const imageBlob = new Blob([screenshotBuffer], { type: 'png' });
     return new NextResponse(imageBlob, {
