@@ -176,17 +176,17 @@ export default function ProfileForm() {
           <div>
             <p className="font-semibold">Celular</p>
               {!editing.contact ? (
-                loading ? <FieldSkeleton width="h-4.5 w-40" /> : <p className="text-gray-700">{display(profile.celular)}</p>
+                loading ? <FieldSkeleton width="h-4.5 w-40" /> : <p className="text-gray-700" data-testid="profile-celular-value">{display(profile.celular)}</p>
             ) : (
-              <input aria-label="Celular" placeholder="Ej. 987654321" title="Celular" className="mt-1 w-full rounded border px-3 py-2" value={profile.celular || ''} onChange={(e) => setProfile(prev => ({ ...prev, celular: e.target.value }))} />
+              <input data-testid="profile-celular-input" aria-label="Celular" placeholder="Ej. 987654321" title="Celular" className="mt-1 w-full rounded border px-3 py-2" value={profile.celular || ''} onChange={(e) => setProfile(prev => ({ ...prev, celular: e.target.value }))} />
             )}
           </div>
           {!editing.contact ? (
-            <button disabled={loading} className={`text-blue-600 hover:underline ${loading ? 'opacity-40 cursor-not-allowed' : ''}`} onClick={() => startEdit('contact')}>Editar</button>
+            <button data-testid="profile-celular-edit" disabled={loading} className={`text-blue-600 hover:underline ${loading ? 'opacity-40 cursor-not-allowed' : ''}`} onClick={() => startEdit('contact')}>Editar</button>
           ) : (
             <div className="flex gap-2">
-              <button className="text-blue-600 hover:underline" onClick={async () => { const r = await saveUpdates({ number: profile.celular }); if (r.ok) cancelEdit('contact') }}>Guardar</button>
-              <button className="text-gray-500 hover:underline" onClick={() => cancelEdit('contact')}>Cancelar</button>
+              <button data-testid="profile-celular-save" className="text-blue-600 hover:underline" onClick={async () => { const r = await saveUpdates({ number: profile.celular }); if (r.ok) cancelEdit('contact') }}>Guardar</button>
+              <button data-testid="profile-celular-cancel" className="text-gray-500 hover:underline" onClick={() => cancelEdit('contact')}>Cancelar</button>
             </div>
           )}
         </div>
@@ -195,17 +195,17 @@ export default function ProfileForm() {
           <div>
             <p className="font-semibold">Correo (personal)</p>
               {!editing.contact ? (
-                loading ? <FieldSkeleton width="h-4.5 w-56" /> : <p className="text-gray-700">{display(profile.correo)}</p>
+                loading ? <FieldSkeleton width="h-4.5 w-56" /> : <p className="text-gray-700" data-testid="profile-correo-value">{display(profile.correo)}</p>
             ) : (
-              <input aria-label="Correo personal" placeholder="tu@correo.com" title="Correo personal" className="mt-1 w-full rounded border px-3 py-2" value={profile.correo || ''} onChange={(e) => setProfile(prev => ({ ...prev, correo: e.target.value }))} />
+              <input data-testid="profile-correo-input" aria-label="Correo personal" placeholder="tu@correo.com" title="Correo personal" className="mt-1 w-full rounded border px-3 py-2" value={profile.correo || ''} onChange={(e) => setProfile(prev => ({ ...prev, correo: e.target.value }))} />
             )}
           </div>
           {!editing.contact ? (
-            <button className="text-blue-600 hover:underline" onClick={() => startEdit('contact')}>Editar</button>
+            <button data-testid="profile-correo-edit" className="text-blue-600 hover:underline" onClick={() => startEdit('contact')}>Editar</button>
           ) : (
             <div className="flex gap-2">
-              <button className="text-blue-600 hover:underline" onClick={async () => { const r = await saveUpdates({ emailPersonal: profile.correo }); if (r.ok) cancelEdit('contact') }}>Guardar</button>
-              <button className="text-gray-500 hover:underline" onClick={() => cancelEdit('contact')}>Cancelar</button>
+              <button data-testid="profile-correo-save" className="text-blue-600 hover:underline" onClick={async () => { const r = await saveUpdates({ emailPersonal: profile.correo }); if (r.ok) cancelEdit('contact') }}>Guardar</button>
+              <button data-testid="profile-correo-cancel" className="text-gray-500 hover:underline" onClick={() => cancelEdit('contact')}>Cancelar</button>
             </div>
           )}
         </div>

@@ -236,7 +236,9 @@ export async function GET(request: Request) {
     }
 
     // Try several selectors to be resilient to slight DOM differences or localization
+    // Prefer stable test ids added to the component; fall back to xpath heuristics
     const possibleFirstEditSelectors = [
+      '[data-testid="profile-celular-edit"]',
       "xpath///p[text()='Celular']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']",
       "xpath///p[contains(., 'Celular')]/ancestor::div//button[contains(., 'Editar')]",
       "xpath///button[contains(., 'Editar') and contains(., 'Celular')]",
@@ -301,6 +303,7 @@ export async function GET(request: Request) {
     const phoneInputSelector = 'input[aria-label="Celular"]';
     // Wait for either the standard aria-label input or some alternative selectors
     const possiblePhoneInputs = [
+      '[data-testid="profile-celular-input"]',
       phoneInputSelector,
       "xpath///input[contains(@aria-label, 'Celular')]",
       "xpath///input[contains(@placeholder, 'Celular')]",
