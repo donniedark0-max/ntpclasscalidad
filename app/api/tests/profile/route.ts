@@ -218,15 +218,36 @@ export async function GET(request: Request) {
     // the caller can inspect the loaded page before any edits.
     try {
       const url = new URL(request.url);
-      const preview = url.searchParams.get('preview') === 'true';
-      const previewBuffer = await page.screenshot({ type: 'png' });
-      const nodeBuffer = Buffer.from(previewBuffer as any);
-      if (preview) {
-        console.log('🔎 Preview requested — returning screenshot before edits.');
-        return new NextResponse(nodeBuffer, {
-          status: 200,
-          headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
-        });
+      const previewParam = url.searchParams.get('preview'); // can be 'true', 'after', or null
+      if (previewParam) {
+        if (previewParam === 'after') {
+          // Try to click the edit button (foundEditSel) and then return a screenshot
+          try {
+            if (foundEditSel.startsWith('xpath')) {
+              const inner = foundEditSel.replace(/^xpath\/\/\/?/, '');
+              await page.waitForSelector(`xpath/${inner}`, { visible: true, timeout: 3000 });
+              await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.click(); }, inner);
+            } else {
+              await page.waitForSelector(foundEditSel, { visible: true, timeout: 3000 });
+              await page.click(foundEditSel);
+            }
+            // small delay to let client-side render/hydration happen
+            await new Promise((r) => setTimeout(r, 600));
+          } catch (e) {
+            console.warn('No se pudo clickear el botón Edit antes del preview-after:', e);
+          }
+          const previewBuffer = await page.screenshot({ type: 'png' });
+          try { await page.screenshot({ path: '/tmp/profile_after_edit_click.png' }); } catch(_) {}
+          console.log('🔎 Preview-after requested — returning screenshot after click on Edit.');
+          return new NextResponse(Buffer.from(previewBuffer as any), { status: 200, headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' } });
+        }
+
+        // Default preview (before edits)
+        if (previewParam === 'true') {
+          const previewBuffer = await page.screenshot({ type: 'png' });
+          console.log('🔎 Preview requested — returning screenshot before edits.');
+          return new NextResponse(Buffer.from(previewBuffer as any), { status: 200, headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' } });
+        }
       } else {
         // Always save intermediate screenshot to /tmp for debugging in Vercel logs
         try {
