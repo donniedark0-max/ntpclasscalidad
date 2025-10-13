@@ -373,11 +373,47 @@ export async function GET(request: Request) {
     console.log(` > Celular actualizado a ${newPhone}`);
 
     // -- Editar y Guardar Correo --
-    const editEmailButtonSelector = "xpath///p[contains(text(), 'Correo')]/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
+    const editEmailButtonSelector = '[data-testid="profile-correo-edit"]';
     const emailInputSelector = 'input[aria-label="Correo personal"]';
-    await forceClickAndWait(page, editEmailButtonSelector, emailInputSelector); // ⭐ CAMBIO CLAVE 2
-    await clearAndType(page, emailInputSelector, newEmail);
-    await page.click("xpath///input[@aria-label='Correo personal']/ancestor::div[2]//button[text()='Guardar']");
+    // Try click-first approach similar to Celular
+    let emailInputSel: string | null = null;
+    try {
+      const xpath = await clickEditAndFindInputXPath(page, editEmailButtonSelector, 10000);
+      emailInputSel = `xpath///${xpath}`;
+      try { await page.screenshot({ path: '/tmp/profile_after_edit_email_click.png' }); } catch(_){}
+    } catch (err) {
+      console.warn('⚠️ clickEditAndFindInputXPath for Correo falló, fallback to click + wait selectors:', err);
+      try {
+        if (editEmailButtonSelector.startsWith('xpath')) {
+          const inner = editEmailButtonSelector.replace(/^xpath\/\/\/?/, '');
+          await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.scrollIntoView({behavior:'auto', block:'center'}); el?.click(); }, inner);
+        } else {
+          await page.waitForSelector(editEmailButtonSelector, { visible: true, timeout: 5000 });
+          await page.click(editEmailButtonSelector);
+        }
+      } catch (e) { console.warn('⚠️ No se pudo clickear el Edit correo en fallback:', e); }
+
+      try {
+        const sel = await waitForAnySelector(page, ['[data-testid="profile-correo-input"]', emailInputSelector, "xpath///input[contains(@aria-label,'Correo')]", "xpath///input[contains(@placeholder,'Correo')]"], { visible: true, timeout: 10000 });
+        emailInputSel = sel;
+      } catch (e) { console.warn('⚠️ No apareció input correo tras click:', e); }
+    }
+
+    if (emailInputSel) {
+      if (emailInputSel.startsWith('xpath')) {
+        await clearAndType(page, emailInputSel, newEmail);
+        const xpathInner = emailInputSel.replace(/^xpath\/\/\/?/, '');
+        const saveRelXPath = `xpath///${xpathInner}/ancestor::div[2]//button[text()='Guardar']`;
+        try { await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.click(); }, saveRelXPath.replace(/^xpath\/\/\/?/, '')); } catch (e) { try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {} }
+      } else {
+        await clearAndType(page, emailInputSel, newEmail);
+        try { await page.click('[data-testid="profile-correo-save"]'); } catch (_) { try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {} }
+      }
+    } else {
+      await clearAndType(page, emailInputSelector, newEmail).catch(() => {});
+      try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {}
+    }
+
     await page.waitForFunction((email) => document.body.innerText.includes(email), {}, newEmail);
     console.log(` > Correo actualizado a ${newEmail}`);
     
