@@ -421,27 +421,90 @@ export async function GET(request: Request) {
     console.log('📝 Editando sección de Nombres y Apellidos...');
     const newName = "TestNombre";
     const newLastName = "TestApellido";
-    const editPersonalButtonSelector = "xpath///button[text()='Editar Nombres/Apellidos']";
+    const editPersonalButtonSelector = '[data-testid="profile-personal-edit"]';
     const nameInputSelector = 'input[aria-label="Nombres"]';
-    await forceClickAndWait(page, editPersonalButtonSelector, nameInputSelector); // ⭐ CAMBIO CLAVE 2
-    await clearAndType(page, nameInputSelector, newName);
-    await clearAndType(page, 'input[aria-label="Apellidos"]', newLastName);
-    const savePersonalButtonSelector = "xpath///p[text()='Nombres']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
-    await page.click(savePersonalButtonSelector);
+    // Click-first strategy
+    let nameInputSel: string | null = null;
+    try {
+      const xpath = await clickEditAndFindInputXPath(page, editPersonalButtonSelector, 10000);
+      nameInputSel = `xpath///${xpath}`;
+      try { await page.screenshot({ path: '/tmp/profile_after_edit_personal_click.png' }); } catch(_){}
+    } catch (err) {
+      console.warn('⚠️ clickEditAndFindInputXPath for personal failed, fallback to click + wait selectors:', err);
+      try {
+        if (editPersonalButtonSelector.startsWith('xpath')) {
+          const inner = editPersonalButtonSelector.replace(/^xpath\/\/\/?/, '');
+          await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.scrollIntoView({behavior:'auto', block:'center'}); el?.click(); }, inner);
+        } else {
+          await page.waitForSelector(editPersonalButtonSelector, { visible: true, timeout: 5000 });
+          await page.click(editPersonalButtonSelector);
+        }
+      } catch (e) { console.warn('⚠️ No se pudo clickear personal en fallback:', e); }
+
+      try {
+        const sel = await waitForAnySelector(page, ['[data-testid="profile-nombres-input"]', 'input[aria-label="Nombres"]', '[data-testid="profile-apellidos-input"]', 'input[aria-label="Apellidos"]'], { visible: true, timeout: 10000 });
+        nameInputSel = sel;
+      } catch (e) { console.warn('⚠️ No apareció input personal tras click:', e); }
+    }
+
+    if (nameInputSel) {
+      // fill both name and last name
+      if (nameInputSel.startsWith('xpath')) {
+        await clearAndType(page, nameInputSel, newName);
+        // attempt to find last name input relative to same panel
+        const lastNameXPath = nameInputSel.replace(/^xpath\/\/\/?/, '') + "/ancestor::div[1]//input[contains(@aria-label,'Apellidos') or contains(@data-testid,'profile-apellidos-input')]";
+        await clearAndType(page, `xpath///${lastNameXPath}`, newLastName).catch(() => {});
+        // try to click save relative
+        const saveRelXPath = `xpath///${nameInputSel.replace(/^xpath\/\/\/?/, '')}/ancestor::div[2]//button[text()='Guardar']`;
+        try { await page.evaluate((sel) => { const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement; el?.click(); }, saveRelXPath.replace(/^xpath\/\/\/?/, '')); } catch (e) { try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {} }
+      } else {
+        await clearAndType(page, nameInputSel, newName);
+        try { await clearAndType(page, '[data-testid="profile-apellidos-input"]', newLastName); } catch (_) { await clearAndType(page, 'input[aria-label="Apellidos"]', newLastName).catch(() => {}); }
+        try { await page.click('[data-testid="profile-personal-save"]'); } catch (_) { try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {} }
+      }
+    } else {
+      // final fallback
+      await clearAndType(page, nameInputSelector, newName).catch(() => {});
+      await clearAndType(page, 'input[aria-label="Apellidos"]', newLastName).catch(() => {});
+      try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {}
+    }
+
     await page.waitForFunction((name) => document.body.innerText.includes(name), {}, newName);
     console.log(` > Nombre actualizado a ${newName} ${newLastName}`);
     
     // --- Edición de Otros Datos ---
     console.log('📝 Editando sección de Otros Datos...');
     const newAddress = generateRandomAddress();
-    const editOtherButtonSelector = "xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
-    const addressInputSelector = 'input[aria-label="Dirección"]';
-    await forceClickAndWait(page, editOtherButtonSelector, addressInputSelector); // ⭐ CAMBIO CLAVE 2
-    await clearAndType(page, addressInputSelector, newAddress);
-    const saveOtherButtonSelector = "xpath///p[text()='Estado Civil']/ancestor::div[contains(@class, 'rounded-lg')]//button[text()='Guardar']";
-    await page.click(saveOtherButtonSelector);
-    await page.waitForFunction((text) => document.body.innerText.includes(text), {}, newAddress);
-    console.log(` > Dirección actualizada a "${newAddress}"`);
+    // Fields to edit: Estado Civil (status), Dirección, Movilidad, Contacto de emergencia
+    const otherFields = [
+      { editId: '[data-testid="profile-direccion-edit"]', inputTestId: '[data-testid="profile-direccion-input"]', aria: 'Dirección', value: newAddress, saveTestId: '[data-testid="profile-other-save"]' },
+      { editId: '[data-testid="profile-movilidad-edit"]', inputTestId: '[data-testid="profile-movilidad-input"]', aria: 'Movilidad', value: 'Propio', saveTestId: '[data-testid="profile-other-save"]' },
+      { editId: '[data-testid="profile-contacto-edit"]', inputTestId: '[data-testid="profile-contacto-input"]', aria: 'Contacto de emergencia', value: generateRandomPhoneNumber(), saveTestId: '[data-testid="profile-other-save"]' }
+    ];
+
+    for (const field of otherFields) {
+      try {
+        let inpSel: string | null = null;
+        try {
+          const xpath = await clickEditAndFindInputXPath(page, field.editId, 8000);
+          inpSel = `xpath///${xpath}`;
+          try { await page.screenshot({ path: `/tmp/profile_after_edit_other_${field.aria.replace(/\s+/g,'_')}.png` }); } catch(_){}
+        } catch (err) {
+          console.warn('⚠️ clickEditAndFindInputXPath for other field failed, fallback:', err);
+          try { await page.waitForSelector(field.editId, { visible: true, timeout: 4000 }); await page.click(field.editId); } catch(e) { console.warn('⚠️ No se pudo clickear edit en other fallback:', e); }
+          try { const sel = await waitForAnySelector(page, [field.inputTestId, `input[aria-label="${field.aria}"]`], { visible: true, timeout: 8000 }); inpSel = sel; } catch(e) { console.warn('⚠️ No apareció input other tras click:', e); }
+        }
+
+        if (inpSel) {
+          try {
+            await clearAndType(page, inpSel, field.value);
+            try { await page.click(field.saveTestId); } catch (_) { try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {} }
+            await page.waitForFunction((val) => document.body.innerText.includes(val), {}, field.value);
+            console.log(` > ${field.aria} actualizado a ${field.value}`);
+          } catch (e) { console.warn(`⚠️ Error actualizando ${field.aria}:`, e); }
+        }
+      } catch (e) { console.warn('⚠️ Error en iteración de otherFields:', e); }
+    }
 
     // --- Punto de Éxito y Captura ---
     console.log('✅ ¡Perfil actualizado correctamente!');

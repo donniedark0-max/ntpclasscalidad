@@ -231,7 +231,7 @@ export default function ProfileForm() {
         {!editing.personal ? (
           loading ? <FieldSkeleton width="h-4.5 w-48" /> : <p className="text-gray-700">{display(profile.nombres)}</p>
             ) : (
-              <input aria-label="Nombres" placeholder="Nombres" title="Nombres" className="mt-1 w-full rounded border px-3 py-2" value={profile.nombres || ''} onChange={(e) => setProfile(prev => ({ ...prev, nombres: e.target.value }))} />
+              <input data-testid="profile-nombres-input" aria-label="Nombres" placeholder="Nombres" title="Nombres" className="mt-1 w-full rounded border px-3 py-2" value={profile.nombres || ''} onChange={(e) => setProfile(prev => ({ ...prev, nombres: e.target.value }))} />
             )}
           </div>
 
@@ -240,7 +240,7 @@ export default function ProfileForm() {
             {!editing.personal ? (
               loading ? <FieldSkeleton width="h-4.5 w-48" /> : <p className="text-gray-700">{display(profile.apellidos)}</p>
             ) : (
-              <input aria-label="Apellidos" placeholder="Apellidos" title="Apellidos" className="mt-1 w-full rounded border px-3 py-2" value={profile.apellidos || ''} onChange={(e) => setProfile(prev => ({ ...prev, apellidos: e.target.value }))} />
+              <input data-testid="profile-apellidos-input" aria-label="Apellidos" placeholder="Apellidos" title="Apellidos" className="mt-1 w-full rounded border px-3 py-2" value={profile.apellidos || ''} onChange={(e) => setProfile(prev => ({ ...prev, apellidos: e.target.value }))} />
             )}
           </div>
 
@@ -270,12 +270,12 @@ export default function ProfileForm() {
           </div>
           {!editing.personal ? (
             <div className="mt-3">
-              <button className="text-blue-600 hover:underline" onClick={() => startEdit('personal')}>Editar Nombres/Apellidos</button>
+              <button data-testid="profile-personal-edit" className="text-blue-600 hover:underline" onClick={() => startEdit('personal')}>Editar Nombres/Apellidos</button>
             </div>
           ) : (
             <div className="mt-3 flex gap-2">
-              <button className="text-blue-600 hover:underline" onClick={async () => { const r = await saveUpdates({ name: profile.nombres, lastname: profile.apellidos }); if (r.ok) cancelEdit('personal') }}>Guardar</button>
-              <button className="text-gray-500 hover:underline" onClick={() => cancelEdit('personal')}>Cancelar</button>
+              <button data-testid="profile-personal-save" className="text-blue-600 hover:underline" onClick={async () => { const r = await saveUpdates({ name: profile.nombres, lastname: profile.apellidos }); if (r.ok) cancelEdit('personal') }}>Guardar</button>
+              <button data-testid="profile-personal-cancel" className="text-gray-500 hover:underline" onClick={() => cancelEdit('personal')}>Cancelar</button>
             </div>
           )}
         </div>
@@ -304,11 +304,11 @@ export default function ProfileForm() {
               {!editing.other ? (
                 loading ? <FieldSkeleton width="h-4.5 w-72" /> : <p className="text-gray-700">{display(profile.direccion)}</p>
               ) : (
-                <input aria-label="Dirección" placeholder="Dirección" title="Dirección" className="mt-1 w-full rounded border px-3 py-2" value={profile.direccion || ''} onChange={(e) => setProfile(prev => ({ ...prev, direccion: e.target.value }))} />
+                <input data-testid="profile-direccion-input" aria-label="Dirección" placeholder="Dirección" title="Dirección" className="mt-1 w-full rounded border px-3 py-2" value={profile.direccion || ''} onChange={(e) => setProfile(prev => ({ ...prev, direccion: e.target.value }))} />
               )}
             </div>
             {!editing.other ? (
-              <button className="text-blue-600 hover:underline" onClick={() => startEdit('other')}>Editar</button>
+              <button data-testid="profile-direccion-edit" className="text-blue-600 hover:underline" onClick={() => startEdit('other')}>Editar</button>
             ) : null}
           </div>
 
@@ -318,11 +318,11 @@ export default function ProfileForm() {
               {!editing.other ? (
                 loading ? <FieldSkeleton width="h-4.5 h-4.5w-40" /> : <p className="text-gray-700">{display(profile.movilidad)}</p>
               ) : (
-                <input aria-label="Movilidad" placeholder="Movilidad" title="Movilidad" className="mt-1 w-full rounded border px-3 py-2" value={profile.movilidad || ''} onChange={(e) => setProfile(prev => ({ ...prev, movilidad: e.target.value }))} />
+                <input data-testid="profile-movilidad-input" aria-label="Movilidad" placeholder="Movilidad" title="Movilidad" className="mt-1 w-full rounded border px-3 py-2" value={profile.movilidad || ''} onChange={(e) => setProfile(prev => ({ ...prev, movilidad: e.target.value }))} />
               )}
             </div>
             {!editing.other ? (
-              <button className="text-blue-600 hover:underline" onClick={() => startEdit('other')}>Editar</button>
+              <button data-testid="profile-movilidad-edit" className="text-blue-600 hover:underline" onClick={() => startEdit('other')}>Editar</button>
             ) : null}
           </div>
 
@@ -332,17 +332,17 @@ export default function ProfileForm() {
               {!editing.other ? (
                 loading ? <FieldSkeleton width="h-4.5 h-4.5w-40" /> : <p className="text-gray-700">{display(profile.contactoEmergencia)}</p>
               ) : (
-                <input aria-label="Contacto de emergencia" placeholder="Contacto de emergencia" title="Contacto de emergencia" className="mt-1 w-full rounded border px-3 py-2" value={profile.contactoEmergencia || ''} onChange={(e) => setProfile(prev => ({ ...prev, contactoEmergencia: e.target.value }))} />
+                <input data-testid="profile-contacto-input" aria-label="Contacto de emergencia" placeholder="Contacto de emergencia" title="Contacto de emergencia" className="mt-1 w-full rounded border px-3 py-2" value={profile.contactoEmergencia || ''} onChange={(e) => setProfile(prev => ({ ...prev, contactoEmergencia: e.target.value }))} />
               )}
             </div>
             {!editing.other ? (
-              <button className="text-blue-600 hover:underline" onClick={() => startEdit('other')}>Editar</button>
+              <button data-testid="profile-contacto-edit" className="text-blue-600 hover:underline" onClick={() => startEdit('other')}>Editar</button>
             ) : null}
           </div>
 
           {editing.other ? (
             <div className="mt-4 flex gap-2">
-              <button className="text-blue-600 hover:underline" onClick={async () => {
+              <button data-testid="profile-other-save" className="text-blue-600 hover:underline" onClick={async () => {
                 const updates: Record<string, any> = {
                   status: profile.estadoCivil || null,
                   located: profile.direccion || null,
@@ -352,7 +352,7 @@ export default function ProfileForm() {
                 const r = await saveUpdates(updates)
                 if (r.ok) cancelEdit('other')
               }}>Guardar</button>
-              <button className="text-gray-500 hover:underline" onClick={() => cancelEdit('other')}>Cancelar</button>
+              <button data-testid="profile-other-cancel" className="text-gray-500 hover:underline" onClick={() => cancelEdit('other')}>Cancelar</button>
             </div>
           ) : null}
         </div>
