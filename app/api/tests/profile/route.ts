@@ -104,9 +104,9 @@ async function clickEditAndFindInputXPath(page: Page, clickSelector: string, tim
         return true;
       } catch (e) { return false; }
     }, xpathInner);
-    if (!clicked) {
+  if (!clicked) {
       // Fallback: find a button with text 'Editar' that's close to a label that contains 'Celular'
-      const fallback = await page.evaluate(() => {
+  const fallback = await page.evaluate(() => {
         try {
           const buttons = Array.from(document.querySelectorAll('button')) as HTMLElement[];
           for (const btn of buttons) {
@@ -267,7 +267,7 @@ export async function GET(request: Request) {
             // small delay to let client-side render/hydration happen
             await new Promise((r) => setTimeout(r, 600));
           } catch (e) {
-            console.warn('No se pudo clickear el botón Edit antes del preview-after:', e);
+            console.info('ℹ️ No se pudo clickear el botón Edit antes del preview-after:', e instanceof Error ? e.message : String(e));
           }
           const previewBuffer = await page.screenshot({ type: 'png' });
           try { await page.screenshot({ path: '/tmp/profile_after_edit_click.png' }); } catch(_) {}
@@ -316,8 +316,8 @@ export async function GET(request: Request) {
       console.log('✅ Input XPath encontrado en el panel editado:', xpath);
       inputSel = `xpath///${xpath}`;
       try { await page.screenshot({ path: '/tmp/profile_after_edit_click.png' }); console.log('📸 Captura tras click en Editar guardada en /tmp/profile_after_edit_click.png'); } catch(e){/*ignore*/}
-    } catch (err) {
-      console.warn('⚠️ clickEditAndFindInputXPath falló (intentaremos click robusto + esperar selectores comunes):', err);
+  } catch (err) {
+  console.info('ℹ️ clickEditAndFindInputXPath falló — intentaremos click robusto y esperar selectores comunes:', err instanceof Error ? err.message : String(err));
       // Ensure we clicked the Edit button (robust click)
       try {
         if (foundEditSel.startsWith('xpath')) {
@@ -328,7 +328,7 @@ export async function GET(request: Request) {
           await page.click(foundEditSel);
         }
       } catch (e) {
-        console.warn('⚠️ No se pudo clickear el Edit en el fallback:', e);
+        console.info('ℹ️ No se pudo clickear el Edit en el fallback (continuando):', e instanceof Error ? e.message : String(e));
       }
 
       // After clicking, wait for one of the known input selectors to appear
@@ -337,7 +337,7 @@ export async function GET(request: Request) {
         inputSel = sel;
         console.log('✅ Selector de input detectado tras click:', sel);
       } catch (e) {
-        console.warn('⚠️ No aparecieron los selectores esperados tras click:', e);
+        console.info('ℹ️ No aparecieron los selectores esperados tras click (continuando):', e instanceof Error ? e.message : String(e));
         inputSel = null;
       }
     }
@@ -368,9 +368,9 @@ export async function GET(request: Request) {
       try { await page.click("xpath///button[text()='Guardar']"); } catch (_) { /* ignore */ }
     }
 
-    await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
-    console.log(` > Celular actualizado a ${newPhone}`);
-    console.log(` > Celular actualizado a ${newPhone}`);
+  await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
+  console.log(` > Celular actualizado a ${newPhone}`);
+  try { await page.screenshot({ path: '/tmp/profile_after_phone_saved.png' }); console.log('📸 Captura tras guardar Celular en /tmp/profile_after_phone_saved.png'); } catch(_){}
 
     // -- Editar y Guardar Correo --
     const editEmailButtonSelector = '[data-testid="profile-correo-edit"]';
@@ -382,7 +382,7 @@ export async function GET(request: Request) {
       emailInputSel = `xpath///${xpath}`;
       try { await page.screenshot({ path: '/tmp/profile_after_edit_email_click.png' }); } catch(_){}
     } catch (err) {
-      console.warn('⚠️ clickEditAndFindInputXPath for Correo falló, fallback to click + wait selectors:', err);
+      console.info('ℹ️ clickEditAndFindInputXPath for Correo falló — fallback to click + wait selectors:', err instanceof Error ? err.message : String(err));
       try {
         if (editEmailButtonSelector.startsWith('xpath')) {
           const inner = editEmailButtonSelector.replace(/^xpath\/\/\/?/, '');
@@ -391,12 +391,12 @@ export async function GET(request: Request) {
           await page.waitForSelector(editEmailButtonSelector, { visible: true, timeout: 5000 });
           await page.click(editEmailButtonSelector);
         }
-      } catch (e) { console.warn('⚠️ No se pudo clickear el Edit correo en fallback:', e); }
+  } catch (e) { console.info('ℹ️ No se pudo clickear el Edit correo en fallback (continuando):', e instanceof Error ? e.message : String(e)); }
 
       try {
         const sel = await waitForAnySelector(page, ['[data-testid="profile-correo-input"]', emailInputSelector, "xpath///input[contains(@aria-label,'Correo')]", "xpath///input[contains(@placeholder,'Correo')]"], { visible: true, timeout: 10000 });
         emailInputSel = sel;
-      } catch (e) { console.warn('⚠️ No apareció input correo tras click:', e); }
+  } catch (e) { console.info('ℹ️ No apareció input correo tras click (continuando):', e instanceof Error ? e.message : String(e)); }
     }
 
     if (emailInputSel) {
@@ -414,8 +414,9 @@ export async function GET(request: Request) {
       try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {}
     }
 
-    await page.waitForFunction((email) => document.body.innerText.includes(email), {}, newEmail);
-    console.log(` > Correo actualizado a ${newEmail}`);
+  await page.waitForFunction((email) => document.body.innerText.includes(email), {}, newEmail);
+  console.log(` > Correo actualizado a ${newEmail}`);
+  try { await page.screenshot({ path: '/tmp/profile_after_email_saved.png' }); console.log('📸 Captura tras guardar Correo en /tmp/profile_after_email_saved.png'); } catch(_){}
     
     // --- Edición de Nombres y Apellidos ---
     console.log('📝 Editando sección de Nombres y Apellidos...');
@@ -430,7 +431,7 @@ export async function GET(request: Request) {
       nameInputSel = `xpath///${xpath}`;
       try { await page.screenshot({ path: '/tmp/profile_after_edit_personal_click.png' }); } catch(_){}
     } catch (err) {
-      console.warn('⚠️ clickEditAndFindInputXPath for personal failed, fallback to click + wait selectors:', err);
+      console.info('ℹ️ clickEditAndFindInputXPath for personal failed — fallback to click + wait selectors:', err instanceof Error ? err.message : String(err));
       try {
         if (editPersonalButtonSelector.startsWith('xpath')) {
           const inner = editPersonalButtonSelector.replace(/^xpath\/\/\/?/, '');
@@ -439,12 +440,12 @@ export async function GET(request: Request) {
           await page.waitForSelector(editPersonalButtonSelector, { visible: true, timeout: 5000 });
           await page.click(editPersonalButtonSelector);
         }
-      } catch (e) { console.warn('⚠️ No se pudo clickear personal en fallback:', e); }
+  } catch (e) { console.info('ℹ️ No se pudo clickear personal en fallback (continuando):', e instanceof Error ? e.message : String(e)); }
 
       try {
         const sel = await waitForAnySelector(page, ['[data-testid="profile-nombres-input"]', 'input[aria-label="Nombres"]', '[data-testid="profile-apellidos-input"]', 'input[aria-label="Apellidos"]'], { visible: true, timeout: 10000 });
         nameInputSel = sel;
-      } catch (e) { console.warn('⚠️ No apareció input personal tras click:', e); }
+  } catch (e) { console.info('ℹ️ No apareció input personal tras click (continuando):', e instanceof Error ? e.message : String(e)); }
     }
 
     if (nameInputSel) {
@@ -469,8 +470,9 @@ export async function GET(request: Request) {
       try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {}
     }
 
-    await page.waitForFunction((name) => document.body.innerText.includes(name), {}, newName);
-    console.log(` > Nombre actualizado a ${newName} ${newLastName}`);
+  await page.waitForFunction((name) => document.body.innerText.includes(name), {}, newName);
+  console.log(` > Nombre actualizado a ${newName} ${newLastName}`);
+  try { await page.screenshot({ path: '/tmp/profile_after_name_saved.png' }); console.log('📸 Captura tras guardar Nombre/Apellido en /tmp/profile_after_name_saved.png'); } catch(_){}
     
     // --- Edición de Otros Datos ---
     console.log('📝 Editando sección de Otros Datos...');
@@ -490,9 +492,9 @@ export async function GET(request: Request) {
           inpSel = `xpath///${xpath}`;
           try { await page.screenshot({ path: `/tmp/profile_after_edit_other_${field.aria.replace(/\s+/g,'_')}.png` }); } catch(_){}
         } catch (err) {
-          console.warn('⚠️ clickEditAndFindInputXPath for other field failed, fallback:', err);
-          try { await page.waitForSelector(field.editId, { visible: true, timeout: 4000 }); await page.click(field.editId); } catch(e) { console.warn('⚠️ No se pudo clickear edit en other fallback:', e); }
-          try { const sel = await waitForAnySelector(page, [field.inputTestId, `input[aria-label="${field.aria}"]`], { visible: true, timeout: 8000 }); inpSel = sel; } catch(e) { console.warn('⚠️ No apareció input other tras click:', e); }
+          console.info('ℹ️ clickEditAndFindInputXPath for other field failed — fallback:', err instanceof Error ? err.message : String(err));
+          try { await page.waitForSelector(field.editId, { visible: true, timeout: 4000 }); await page.click(field.editId); } catch(e) { console.info('ℹ️ No se pudo clickear edit en other fallback (continuando):', e instanceof Error ? e.message : String(e)); }
+          try { const sel = await waitForAnySelector(page, [field.inputTestId, `input[aria-label="${field.aria}"]`], { visible: true, timeout: 8000 }); inpSel = sel; } catch(e) { console.info('ℹ️ No apareció input other tras click (continuando):', e instanceof Error ? e.message : String(e)); }
         }
 
         if (inpSel) {
@@ -501,9 +503,9 @@ export async function GET(request: Request) {
             try { await page.click(field.saveTestId); } catch (_) { try { await page.click("xpath///button[text()='Guardar']"); } catch (_) {} }
             await page.waitForFunction((val) => document.body.innerText.includes(val), {}, field.value);
             console.log(` > ${field.aria} actualizado a ${field.value}`);
-          } catch (e) { console.warn(`⚠️ Error actualizando ${field.aria}:`, e); }
+          } catch (e) { console.info(`ℹ️ Error actualizando ${field.aria}:`, e instanceof Error ? e.message : String(e)); }
         }
-      } catch (e) { console.warn('⚠️ Error en iteración de otherFields:', e); }
+      } catch (e) { console.info('ℹ️ Error en iteración de otherFields (continuando):', e instanceof Error ? e.message : String(e)); }
     }
 
     // --- Punto de Éxito y Captura ---
