@@ -91,11 +91,42 @@ async function clickEditAndFindInputXPath(page: Page, clickSelector: string, tim
   // First, click the button (supports xpath or css)
   if (clickSelector.startsWith('xpath')) {
     const xpathInner = clickSelector.replace(/^xpath\/\/\/?/, '');
-    await page.waitForSelector(`xpath/${xpathInner}`, { visible: true, timeout: 5000 });
-    await page.evaluate((sel) => {
-      const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
-      el?.click();
+    // Try a robust in-page click using XPath
+    const clicked = await page.evaluate((sel) => {
+      try {
+        const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement | null;
+        if (!el) return false;
+        el.scrollIntoView({ behavior: 'auto', block: 'center' });
+        // dispatch synthetic events to better emulate a real user
+        el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+        el.click();
+        return true;
+      } catch (e) { return false; }
     }, xpathInner);
+    if (!clicked) {
+      // Fallback: find a button with text 'Editar' that's close to a label that contains 'Celular'
+      const fallback = await page.evaluate(() => {
+        try {
+          const buttons = Array.from(document.querySelectorAll('button')) as HTMLElement[];
+          for (const btn of buttons) {
+            const txt = (btn.textContent || '').trim();
+            if (!/editar/i.test(txt)) continue;
+            // check proximity: look for a 'p' ancestor sibling with text 'Celular'
+            let anc: Element | null = btn.closest('div');
+            for (let i = 0; i < 8 && anc; i++) {
+              const p = Array.from(anc.querySelectorAll('p')).find(el => (el.textContent || '').trim().toLowerCase() === 'celular');
+              if (p) { btn.scrollIntoView({ behavior: 'auto', block: 'center' }); btn.click(); return true; }
+              anc = anc.parentElement;
+            }
+          }
+        } catch (e) { }
+        return false;
+      });
+      if (!fallback) {
+        throw new Error('Could not click xpath selector or fallback button');
+      }
+    }
   } else {
     await page.waitForSelector(clickSelector, { visible: true, timeout: 5000 });
     await page.click(clickSelector);
