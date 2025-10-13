@@ -20,12 +20,23 @@ function generateRandomAddress(): string {
   return `${streets[Math.floor(Math.random() * streets.length)]} ${number}`;
 }
 async function clearAndType(page: Page, selector: string, text: string) {
-  await page.waitForSelector(selector, { visible: true });
-  await page.evaluate((sel) => {
+  if (selector.startsWith('xpath')) {
+    const xpathInner = selector.replace(/^xpath\/\/\/??/, '');
+    await page.waitForSelector(`xpath/${xpathInner}`, { visible: true });
+  const handles = await (page as any).$x(xpathInner);
+  if (!handles || handles.length === 0) throw new Error(`No element found for xpath: ${xpathInner}`);
+  const el = handles[0];
+  // Clear and type using the element handle
+  await page.evaluate((e: any) => { (e as HTMLInputElement).value = ''; }, el);
+  await (el as any).type(text);
+  } else {
+    await page.waitForSelector(selector, { visible: true });
+    await page.evaluate((sel) => {
       const input = document.querySelector(sel) as HTMLInputElement;
       if (input) input.value = '';
-  }, selector);
-  await page.type(selector, text);
+    }, selector);
+    await page.type(selector, text);
+  }
 }
 
 // Espera por cualquiera de varios selectores (CSS o xpath///...) con reintentos.
@@ -50,16 +61,26 @@ async function waitForAnySelector(page: Page, selectors: string[], opts: {visibl
 // ⭐ CAMBIO CLAVE 1: Nueva función de clic ultra-robusta que fuerza el evento en el navegador.
 async function forceClickAndWait(page: Page, clickSelector: string, waitSelector: string) {
   console.log(` > Forzando clic en '${clickSelector}' y esperando por '${waitSelector}'...`);
-  await page.waitForSelector(clickSelector, { visible: true });
-  
-  await page.evaluate((sel) => {
-    // Esta función se ejecuta DENTRO del navegador.
-    const element = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
-    element?.click();
-  }, clickSelector.replace('xpath///', '')); // Le quitamos el prefijo para usarlo en el navegador
+  // Support xpath or css for clickSelector
+  if (clickSelector.startsWith('xpath')) {
+    const xpathInner = clickSelector.replace(/^xpath\/\/\/??/, '');
+  await page.waitForSelector(`xpath/${xpathInner}`, { visible: true });
+    await page.evaluate((sel) => {
+      const element = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
+      element?.click();
+    }, xpathInner);
+  } else {
+    await page.waitForSelector(clickSelector, { visible: true });
+    await page.click(clickSelector);
+  }
 
-  // Después de forzar el clic, esperamos a que aparezca el resultado.
-  await page.waitForSelector(waitSelector, { visible: true, timeout: 20000 });
+  // Wait for the result selector (supports xpath)
+  if (waitSelector.startsWith('xpath')) {
+    const waitInner = waitSelector.replace(/^xpath\/\/\/??/, '');
+  await page.waitForSelector(`xpath/${waitInner}`, { visible: true, timeout: 20000 });
+  } else {
+    await page.waitForSelector(waitSelector, { visible: true, timeout: 20000 });
+  }
 }
 
 
