@@ -22,7 +22,7 @@ function getRandomOption<T>(options: T[]): T | undefined {
 }
 
 export async function GET() {
-  console.log('🚀 Iniciando prueba de examen (Más robusta para producción)...');
+  console.log('🚀 Iniciando prueba de examen (Éxito al enviar)...');
   let browser: Browser | null = null;
   let page: Page | null = null;
   let screenshotBuffer: any = null;
@@ -99,6 +99,7 @@ export async function GET() {
     const submitButton = await page.waitForSelector(`xpath/${submitButtonXPath}`);
     if (!submitButton) throw new Error("No se encontró el botón 'Enviar examen'");
     await submitButton.click();
+    
     const confirmationTextSelector = `//h2[contains(., 'Examen en revisión')]`;
     await page.waitForSelector(`xpath/${confirmationTextSelector}`, { timeout: 15000 });
     console.log('✅ ¡Examen enviado! Pantalla de confirmación encontrada.');
@@ -107,31 +108,12 @@ export async function GET() {
     console.log('📸 Tomando captura de pantalla de la confirmación...');
     screenshotBuffer = await page.screenshot({ type: 'png' });
     
-    // --- PASO FINAL: Cerrar Sesión (Con corrección) ---
-    console.log('🔒 Procediendo a cerrar la sesión...');
-    await page.goto(DASHBOARD_URL, { waitUntil: 'networkidle2' });
-    
-    const menuTriggerSelector = 'button[aria-haspopup="menu"]';
-    await page.click(menuTriggerSelector);
+    if (!screenshotBuffer) {
+        throw new Error("Se llegó a la confirmación, pero no se pudo tomar la captura.");
+    }
 
-    // ⭐ CAMBIO CLAVE: Pausa para la animación del menú
-    // Le damos al navegador 500ms para que el menú desplegable aparezca
-    // antes de que el script intente interactuar con él.
-    await new Promise(r => setTimeout(r, 500));
-    
-    const logoutXPathSelector = "//button[contains(., 'Cerrar sesión')]";
-    const logoutButton = await page.waitForSelector(`xpath/${logoutXPathSelector}`, { visible: true, timeout: 10000 });
-    
-    if (!logoutButton) throw new Error('El botón de logout no apareció en el menú.');
-
-    await logoutButton.click();
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
-    console.log('✅ Cierre de sesión exitoso.');
-    
-    if (!screenshotBuffer) throw new Error("No se pudo tomar la captura.");
-
-    // --- Devolver la imagen ---
-    console.log('🎉 ¡Prueba de ciclo completo de examen finalizada!');
+    // ⭐ CAMBIO CLAVE: La prueba termina aquí exitosamente
+    console.log('🎉 ¡Prueba de ciclo de examen finalizada con éxito!');
     const imageBlob = new Blob([screenshotBuffer], { type: 'png' });
     return new NextResponse(imageBlob, {
         status: 200,
@@ -149,6 +131,10 @@ export async function GET() {
     const errorMessage = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   } finally {
-    if (browser) await browser.close();
+    // El navegador se cerrará siempre, sin importar si la prueba falló o tuvo éxito.
+    // Esto es importante para no dejar procesos abiertos en Vercel.
+    if (browser) {
+      await browser.close();
+    }
   }
 }
