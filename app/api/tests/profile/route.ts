@@ -28,6 +28,25 @@ async function clearAndType(page: Page, selector: string, text: string) {
   await page.type(selector, text);
 }
 
+// Espera por cualquiera de varios selectores (CSS o xpath///...) con reintentos.
+async function waitForAnySelector(page: Page, selectors: string[], opts: {visible?: boolean, timeout?: number} = { visible: true, timeout: 30000 }) {
+  const start = Date.now();
+  const timeout = opts.timeout ?? 30000;
+  const interval = 500;
+  while (Date.now() - start < timeout) {
+    for (const sel of selectors) {
+      try {
+        const handle = await page.waitForSelector(sel.startsWith('xpath/') || sel.startsWith('xpath///') ? sel : sel, { visible: !!opts.visible, timeout: 1000 });
+        if (handle) return sel;
+      } catch (e) {
+        // ignore and try next selector
+      }
+    }
+    await new Promise(r => setTimeout(r, interval));
+  }
+  throw new Error(`None of the selectors became available: ${selectors.join(', ')}`);
+}
+
 // ⭐ CAMBIO CLAVE 1: Nueva función de clic ultra-robusta que fuerza el evento en el navegador.
 async function forceClickAndWait(page: Page, clickSelector: string, waitSelector: string) {
   console.log(` > Forzando clic en '${clickSelector}' y esperando por '${waitSelector}'...`);
@@ -74,9 +93,14 @@ export async function GET() {
     await page.goto(`${APP_URL}/dashboard/profile`, { waitUntil: 'networkidle2' });
     console.log('✅ Navegado a la página de perfil.');
     console.log('⏳ Esperando a que los datos del perfil carguen...');
-    const firstEditButtonSelector = "xpath///p[text()='Celular']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']";
-    await page.waitForSelector(firstEditButtonSelector, { visible: true, timeout: 20000 });
-    console.log('✅ Datos del perfil cargados.');
+    // Try several selectors to be resilient to slight DOM differences or localization
+    const possibleFirstEditSelectors = [
+      "xpath///p[text()='Celular']/ancestor::div[contains(@class, 'justify-between')]//button[text()='Editar']",
+      "xpath///p[contains(., 'Celular')]/ancestor::div//button[contains(., 'Editar')]",
+      "xpath///button[contains(., 'Editar') and contains(., 'Celular')]",
+    ];
+    const foundEditSel = await waitForAnySelector(page, possibleFirstEditSelectors, { visible: true, timeout: 30000 });
+    console.log('✅ Datos del perfil cargados. Selector encontrado:', foundEditSel);
 
     // --- Edición de Contacto ---
     console.log('📝 Editando sección de Contacto...');
@@ -85,7 +109,14 @@ export async function GET() {
     
     // -- Editar y Guardar Celular --
     const phoneInputSelector = 'input[aria-label="Celular"]';
-    await forceClickAndWait(page, firstEditButtonSelector, phoneInputSelector); // ⭐ CAMBIO CLAVE 2
+    // Wait for either the standard aria-label input or some alternative selectors
+    const possiblePhoneInputs = [
+      phoneInputSelector,
+      "xpath///input[contains(@aria-label, 'Celular')]",
+      "xpath///input[contains(@placeholder, 'Celular')]",
+    ];
+    const foundPhoneSel = await waitForAnySelector(page, possiblePhoneInputs, { visible: true, timeout: 30000 });
+    await forceClickAndWait(page, foundEditSel, foundPhoneSel);
     await clearAndType(page, phoneInputSelector, newPhone);
     await page.click("xpath///input[@aria-label='Celular']/ancestor::div[2]//button[text()='Guardar']");
     await page.waitForFunction((phone) => document.body.innerText.includes(phone), {}, newPhone);
